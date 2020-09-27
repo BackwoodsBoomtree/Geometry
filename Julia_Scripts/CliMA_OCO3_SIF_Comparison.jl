@@ -8,7 +8,7 @@ using GLM
 using Statistics
 using StatsPlots
 
-oco3_data = CSV.read("C:/Russell/R_Scripts/Geometry/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_2020-06-26.csv")
+oco3_data = CSV.read("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_2020-06-26.csv")
 
 const FT = Float32
 
@@ -103,7 +103,7 @@ hm = PyPlot.scatter(deg2rad.(RAA), VZA, c = reflNIR, cmap = :viridis, zorder = 1
 PyPlot.title("CliMA - NIR Reflectance (SZA 28.4 - 30.3)")
 PyPlot.colorbar(label = "NIR Reflectance")
 PyPlot.gcf()
-PyPlot.savefig("C:/Russell/Julia_Scripts/Geometry/Figures/Radiance_NIR_CliMA_Polar.pdf")
+PyPlot.savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/Radiance_NIR_CliMA_Polar.pdf")
 
 # Polar plot SIF740 CliMA
 PyPlot.figure(figsize = (10,5))
@@ -113,7 +113,7 @@ hm = PyPlot.scatter(deg2rad.(RAA), VZA, c = SIF_FR, cmap = :viridis, zorder = 10
 PyPlot.title("CliMA - SIF740 (SZA 28.4 - 30.3)")
 PyPlot.colorbar(label = "SIF740")
 PyPlot.gcf()
-PyPlot.savefig("C:/Russell/Julia_Scripts/Geometry/Figures/SIF740_CliMA_Polar.pdf")
+PyPlot.savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/SIF740_CliMA_Polar.pdf")
 
 # Polar plot Radiance OCO
 PyPlot.figure(figsize = (10,5))
@@ -123,7 +123,7 @@ hm = PyPlot.scatter(deg2rad.(RAA), VZA, c = oco3_data[:sif771_R], cmap = :viridi
 PyPlot.title("OCO3 - 771nm Continnum Level Radiance (SZA 28.4 - 30.3)")
 PyPlot.colorbar(label = "771nm Continnum Level Radiance")
 PyPlot.gcf()
-PyPlot.savefig("C:/Russell/Julia_Scripts/Geometry/Figures/Radiance_NIR_OCO3_Polar.pdf")
+PyPlot.savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/Radiance_NIR_OCO3_Polar.pdf")
 
 # Polar plot SIF740 OCO
 PyPlot.figure(figsize = (10,5))
@@ -133,14 +133,14 @@ hm = PyPlot.scatter(deg2rad.(RAA), VZA, c = oco3_data[:sif740], cmap = :viridis,
 PyPlot.title("OCO3 - SIF740 (SZA 28.4 - 30.3)")
 PyPlot.colorbar(label = "SIF740")
 PyPlot.gcf()
-PyPlot.savefig("C:/Russell/Julia_Scripts/Geometry/Figures/SIF740_OCO3_Polar.pdf")
+PyPlot.savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/SIF740_OCO3_Polar.pdf")
 
 # Scatter Plots
 scatter(oco3_data[:sif740], SIF_FR, xlabel = "OCO3 SIF740", ylabel = "CliMA SIF740", legend = false, framestyle = :box)
-savefig("C:/Russell/Julia_Scripts/Geometry/Figures/SIF740_OCO3_CliMA_Scatter_LAI.pdf")
+savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/SIF740_OCO3_CliMA_Scatter_LAI.pdf")
 
 scatter(oco3_data[:rad771], reflNIR, xlabel = "771nm Continnum Level Radiance", ylabel = "NIR Reflectance", legend = false, framestyle = :box)
-savefig("C:/Russell/Julia_Scripts/Geometry/Figures/Radiance_NIR_OCO3_CliMA_Scatter_LAI.pdf")
+savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/Radiance_NIR_OCO3_CliMA_Scatter_LAI.pdf")
 
 # Min and Max SZA from oco3 data
 szamin = minimum(oco3_data[:sza])

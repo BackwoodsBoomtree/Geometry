@@ -3,10 +3,12 @@ library(ncdf4)
 library(raster)
 library(rgdal)
 
-lai <- raster("C:/Russell/R_Scripts/Geometry/data/lai/c_gls_LAI300-LAI_201906200000_CUSTOM_PROBAV_V1.0.1.tiff")
+lai <- raster("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI300-LAI_201906200000_CUSTOM_PROBAV_V1.0.1.tiff")
 
 poly_df_wgs84 <- poly_df
 crs(poly_df_wgs84) <- crs(lai)
+
+lai <- crop(lai, poly_df_wgs84)
 
 # Sample parameter raster using OCO footprint polygons and calculate area weighted mean
 lai_awm <- extract(lai, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)

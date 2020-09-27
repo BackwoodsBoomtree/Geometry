@@ -5,14 +5,16 @@ library(ggplot2)
 library(grid)
 library(sp)
 library(gtools)
+library(raster)
+library(rgdal)
 
 
 options(scipen = 999)
 options(digits = 14)
 
-input_dir <- list.files(path = "C:/Russell/Projects/Geometry/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
+input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
 #input_dir <- list.files(path = "C:/Russell/Projects/Geometry/oco3/Lamont", full.names = TRUE, pattern = "*.nc4")
-target_list <- read.csv("C:/Russell/Projects/Geometry/oco3/site_list/oco3_targets.csv")
+target_list <- read.csv("C:/Russell/Projects/Geometry/Data/oco3/site_list/oco3_targets.csv")
 
 #### FUNCTIONS ####
 cosd <- function(degrees) {
@@ -301,12 +303,23 @@ build_polyDF <- function(df) {
   # Assign Data to polygons as a spatial polygon DF data type
   poly_df <- SpatialPolygonsDataFrame(pollyLayer, df)
 }
+build_lai <- function (lai_raster, poly_df){
+  # Input LAI raster location is from Copernicus (1 km)
+  lai_raster <- brick(lai_raster, varname = "LAI")
+  extent(lai_raster) <- extent(-180, 180, -60, 80)
+  crs(poly_df) <- crs(lai_raster) # Make sure crs match
+  lai_raster <- crop(lai_raster, poly_df) # Crop LAI raster to polygon extent
+  # Sample LAI raster using OCO footprint polygons and calculate area weighted mean
+  lai_awm <- extract(lai_raster, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)
+  poly_df$lai <- as.vector(lai_awm) # add LAI to shapefile
+  return(poly_df)
+}
 plot_data <- function (df, variable, save, site_name, output_dir) {
   register_google(key = "AIzaSyDPeI_hkrch7DqhKmhFJKeADWBpAKJL3h4")
 
   # Labels for plotting
   lab_loc <- gsub("_", " ", site_name)
-  lab_var <- gsub("_", " ", variable)
+  lab_var <- sapply(gsub("_", " ", variable), toupper)
   if (variable == "igbp_class") {
     df$categorical <- df[[variable]]
     df$categorical <- gsub("\\<1\\>", "1 - Evergreen NF", df$categorical)
@@ -341,7 +354,7 @@ plot_data <- function (df, variable, save, site_name, output_dir) {
     df$categorical <- gsub("\\<-1\\>", "-1 - Not Investigated", df$categorical)
     cat_labels <- mixedsort(unique(df$categorical))
   } else {
-    df$categorical <- cut(df[[variable]], 7, include.lowest=TRUE, dig.lab=1)
+    df$categorical <- cut(df[[variable]], 7, include.lowest = TRUE, dig.lab = 3)
     cat_labels <- gsub("\\[|\\]|\\(|\\)", "", sort(unique(df$categorical))) # remove brackets
     cat_labels <- gsub("\\,", " - ", cat_labels)
   }
@@ -374,7 +387,7 @@ plot_data <- function (df, variable, save, site_name, output_dir) {
   #map_bg <- ggplot() + theme_void()
   # Main map
   map_main <- ggmap(get_map(c(map_bb[1], map_bb[2], map_bb[3], map_bb[4]), source = "stamen", maptype="terrain-background", zoom = autozoom)) +
-    geom_polygon(data = df_plot, aes(x = long, y = lat, group = group, fill=factor(categorical))) +
+    geom_polygon(data = df_plot, aes(x = long, y = lat, group = group, fill = factor(categorical))) +
     scale_fill_manual(
       values = rev(viridis(length(unique(df$categorical)))),
       breaks = rev(mixedsort(unique(df$categorical))),
@@ -473,15 +486,21 @@ df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
 df <- subset_cover(df, 2)
 #df <- subset_cover(df, "None") # Lamont
 
-poly_df <- build_polyDF(df)
+poly_df <- build_polyDF(df) # Build shapefile
+
+# Add LAI to polygon
+poly_df <- build_lai("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202006300000_GLOBE_PROBAV_V2.0.1.nc", poly_df)
 
 # Arg: SpatialPolygonDF, variable of interest, save to file?, site name, output directory name
-plot_data(poly_df, "sza", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/R_Scripts/Geometry/")
+plot_data(poly_df, "lai", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
 #plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
 #plot_data(poly_df, "sif740", TRUE, "val_lamontOK", "C:/Russell/R_Scripts/Geometry/")
 
 # Export df to csv
-write.csv(df, paste0("C:/Russell/R_Scripts/Geometry/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
+write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
+
+# Export to shapefile
+shapefile(poly_df, paste0("C:/Russell/Projects/Geometry/R_Scripts/SHP/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), ".shp"), overwrite = TRUE)
 
 
 
