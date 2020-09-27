@@ -304,14 +304,27 @@ build_polyDF <- function(df) {
   poly_df <- SpatialPolygonsDataFrame(pollyLayer, df)
 }
 build_lai <- function (lai_raster, poly_df){
-  # Input LAI raster location is from Copernicus (1 km)
+  # Input LAI raster is from Copernicus (1 km)
   lai_raster <- brick(lai_raster, varname = "LAI")
   extent(lai_raster) <- extent(-180, 180, -60, 80)
+  lai_raster <- projectRaster(lai_raster, crs = "+init=epsg:4326")
   crs(poly_df) <- crs(lai_raster) # Make sure crs match
-  lai_raster <- crop(lai_raster, poly_df) # Crop LAI raster to polygon extent
+  lai_raster <- crop(lai_raster, poly_df) # Crop raster to polygon extent
   # Sample LAI raster using OCO footprint polygons and calculate area weighted mean
   lai_awm <- extract(lai_raster, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)
   poly_df$lai <- as.vector(lai_awm) # add LAI to shapefile
+  return(poly_df)
+}
+build_evi <- function (evi_raster, poly_df){
+  # Input EVI raster is from VPM input
+  evi_raster <- raster(evi_raster)
+  evi_raster <- projectRaster(evi_raster, crs = "+init=epsg:4326")
+  crs(poly_df) <- crs(evi_raster) # Make sure crs match
+  evi_raster <- crop(evi_raster, poly_df) # Crop raster to polygon extent
+  # Sample LAI raster using OCO footprint polygons and calculate area weighted mean
+  evi_awm <- extract(evi_raster, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)
+  evi_awm <- round((evi_awm / 1000), digits = 3)
+  poly_df$evi <- as.vector(evi_awm) # add LAI to shapefile
   return(poly_df)
 }
 plot_data <- function (df, variable, save, site_name, output_dir) {
@@ -488,11 +501,14 @@ df <- subset_cover(df, 2)
 
 poly_df <- build_polyDF(df) # Build shapefile
 
-# Add LAI to polygon
+# Add LAI to shapefile
 poly_df <- build_lai("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202006300000_GLOBE_PROBAV_V2.0.1.nc", poly_df)
 
+# Add EVI to polygon
+poly_df <- build_evi("C:/Russell/Projects/Geometry/Data/evi/GPP.2019177.h12v08.tif", poly_df)
+
 # Arg: SpatialPolygonDF, variable of interest, save to file?, site name, output directory name
-plot_data(poly_df, "lai", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
+plot_data(poly_df, "evi", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
 #plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
 #plot_data(poly_df, "sif740", TRUE, "val_lamontOK", "C:/Russell/R_Scripts/Geometry/")
 

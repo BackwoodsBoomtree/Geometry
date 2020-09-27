@@ -18,6 +18,7 @@ canopy_rt = Canopy4RT{FT, 20, 3.0}()
 canRad_rt = CanopyRadiation{FT, wl_set.nwl, wl_set.nWlF, length(canopy_rt.litab), length(canopy_rt.lazitab), canopy_rt.nlayers}()
 canOpt_rt = create_canopy_optical(FT, wl_set.nwl, canopy_rt.nlayers, length(canopy_rt.lazitab), length(canopy_rt.litab); using_marray=false)
 sunRad_rt = create_incoming_radiation(FT, wl_set.swl);
+leaf.Cab = 60 # For Amazon
 
 # Run Fluspect:
 fluspect!(leaf, wl_set);
@@ -35,6 +36,10 @@ ind_red = argmin(abs.(wl_set.wl .-wl_Red));
 ind_NIR = argmin(abs.(wl_set.wl .-800));
 
 arrayOfLeaves = [create_leaf_bio(FT, wl_set.nwl, wl_set.nWlE, wl_set.nWlF) for i in 1:canopy_rt.nlayers]
+for cab = 1:length(arrayOfLeaves)
+    arrayOfLeaves[cab].Cab = 60
+end
+
 for i in 1:canopy_rt.nlayers
     fluspect!(arrayOfLeaves[i],  wl_set)
 end
@@ -58,11 +63,23 @@ VZA = oco3_data[:vza]
 # LAI
 LAI = oco3_data[:lai]
 
+# EVI
+EVI = oco3_data[:evi]
+EVInorm = Float32[]
+for i = 1:length(EVI)
+    EVInormi = (EVI[i] - minimum(EVI)) / (maximum(EVI) - minimum(EVI))
+     append!(EVInorm, EVInormi)
+end
+
 for i = 1:length(VZA)
     angles.tts = SZA[i]
     angles.psi = RAA[i]
     angles.tto = VZA[i]
     canopy_rt.LAI = LAI[i]
+
+    for j = 1:length(arrayOfLeaves)
+        arrayOfLeaves[j].Cab = arrayOfLeaves[j].Cab * EVInorm[i]
+    end
 
     compute_canopy_geometry!(canopy_rt, angles, canOpt_rt)
     compute_canopy_matrices!(arrayOfLeaves, canOpt_rt);
@@ -137,10 +154,10 @@ PyPlot.savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/SIF740_OCO3_P
 
 # Scatter Plots
 scatter(oco3_data[:sif740], SIF_FR, xlabel = "OCO3 SIF740", ylabel = "CliMA SIF740", legend = false, framestyle = :box)
-savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/SIF740_OCO3_CliMA_Scatter_LAI.pdf")
+savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/SIF740_OCO3_CliMA_Scatter_LAI_EVI.pdf")
 
 scatter(oco3_data[:rad771], reflNIR, xlabel = "771nm Continnum Level Radiance", ylabel = "NIR Reflectance", legend = false, framestyle = :box)
-savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/Radiance_NIR_OCO3_CliMA_Scatter_LAI.pdf")
+savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/Radiance_NIR_OCO3_CliMA_Scatter_LAI_EVI.pdf")
 
 # Min and Max SZA from oco3 data
 szamin = minimum(oco3_data[:sza])
