@@ -4,9 +4,11 @@ using Plots.PlotMeasures
 using Parameters
 using Land
 using Land.CanopyRT
+# using CanopyLayers
 using GLM
 using Statistics
 using StatsPlots
+using DataFrames
 
 oco3_data = CSV.read("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_2020-06-26.csv")
 
@@ -18,7 +20,6 @@ canopy_rt = Canopy4RT{FT, 20, 3.0}()
 canRad_rt = CanopyRadiation{FT, wl_set.nwl, wl_set.nWlF, length(canopy_rt.litab), length(canopy_rt.lazitab), canopy_rt.nlayers}()
 canOpt_rt = create_canopy_optical(FT, wl_set.nwl, canopy_rt.nlayers, length(canopy_rt.lazitab), length(canopy_rt.litab); using_marray=false)
 sunRad_rt = create_incoming_radiation(FT, wl_set.swl);
-leaf.Cab = 60 # For Amazon
 
 # Run Fluspect:
 fluspect!(leaf, wl_set);
@@ -63,23 +64,16 @@ VZA = oco3_data[:vza]
 # LAI
 LAI = oco3_data[:lai]
 
-# EVI
-EVI = oco3_data[:evi]
-EVInorm = Float32[]
-for i = 1:length(EVI)
-    EVInormi = (EVI[i] - minimum(EVI)) / (maximum(EVI) - minimum(EVI))
-     append!(EVInorm, EVInormi)
-end
-
 for i = 1:length(VZA)
     angles.tts = SZA[i]
     angles.psi = RAA[i]
     angles.tto = VZA[i]
     canopy_rt.LAI = LAI[i]
+    # canopy_rt.LAI = 5
 
-    for j = 1:length(arrayOfLeaves)
-        arrayOfLeaves[j].Cab = arrayOfLeaves[j].Cab * EVInorm[i]
-    end
+    # for j = 1:length(arrayOfLeaves)
+    #     arrayOfLeaves[j].Cab = arrayOfLeaves[j].Cab * EVInorm[i]
+    # end
 
     compute_canopy_geometry!(canopy_rt, angles, canOpt_rt)
     compute_canopy_matrices!(arrayOfLeaves, canOpt_rt);
@@ -87,8 +81,8 @@ for i = 1:length(VZA)
     computeSIF_Fluxes!(arrayOfLeaves, canOpt_rt, canRad_rt, canopy_rt, soil, wl_set);
     push!(reflVIS, canRad_rt.alb_obs[28])
     push!(reflNIR, canRad_rt.alb_obs[52])
-    push!(SIF_R , canRad_rt.SIF_obs[8])
-    push!(SIF_FR, canRad_rt.SIF_obs[20])
+    push!(SIF_R  , (canRad_rt.SIF_obs[19] + canRad_rt.SIF_obs[20]) / 2)
+    push!(SIF_FR, canRad_rt.SIF_obs[26])
 end
 
 # Plot Red
@@ -152,12 +146,44 @@ PyPlot.colorbar(label = "SIF740")
 PyPlot.gcf()
 PyPlot.savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/SIF740_OCO3_Polar.pdf")
 
-# Scatter Plots
-scatter(oco3_data[:sif740], SIF_FR, xlabel = "OCO3 SIF740", ylabel = "CliMA SIF740", legend = false, framestyle = :box)
-savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/SIF740_OCO3_CliMA_Scatter_LAI_EVI.pdf")
+scatter(SIF_FR, oco3_data[:sif740])
 
-scatter(oco3_data[:rad771], reflNIR, xlabel = "771nm Continnum Level Radiance", ylabel = "NIR Reflectance", legend = false, framestyle = :box)
-savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/Radiance_NIR_OCO3_CliMA_Scatter_LAI_EVI.pdf")
+# Scatter Plots
+scatter(SIF_FR, oco3_data[:sif740], xlabel = "CliMA SIF740", ylabel = "OCO3 SIF740", xlims = (2.5, 3.1), ylims = (0, 3.1),
+        title = "LAI = 1 km Copernicus, Cab = 60", titlefontsize = 13, legend = false, colorbar = true, framestyle = :box, zcolor = LAI, m = (:viridis, 0.8),
+        colorbar_title = "LAI")
+data = DataFrame(X = SIF_FR, Y = oco3_data[:sif740])
+reg = lm(@formula(Y ~ X), data)
+slope = round(coef(reg)[2], digits = 2)
+intercept = round(coef(reg)[1])
+pval = round(coeftable(reg).cols[4][2], digits = 3)
+if pval == 0
+    pval = "p-value ≤ 0.001"
+else
+    pval = "p-value = $pval"
+end
+plot!(SIF_FR, predict(reg), w = 3)
+annotate!(2.51, 2.75, text("R² = $(round(r2(reg), digits = 2)) \n$pval", :left, 10))
+#annotate!(2.51, 2.75, text("R² = $(round(r2(reg), digits = 2)) \n$pval \ny = $slope * x + $intercept", :left, 10))
+savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/SIF740_OCO3_CliMA_Scatter_LAI.pdf")
+
+scatter(reflNIR, oco3_data[:rad771], xlabel = "CliMA NIR Reflectance", ylabel = "OCO3 771nm Continnum Level Radiance", xlims = (0.40, 0.52), ylims = (0, 150),
+        title = "LAI = 1 km Copernicus, Cab = 60", titlefontsize = 13, legend = false, colorbar = true, framestyle = :box, zcolor = LAI, m = (:viridis, 0.8),
+        colorbar_title = "LAI")
+data = DataFrame(X = reflNIR, Y = oco3_data[:rad771])
+reg = lm(@formula(Y ~ X), data)
+slope = round(coef(reg)[2], digits = 2)
+intercept = round(coef(reg)[1])
+pval = round(coeftable(reg).cols[4][2], digits = 3)
+if pval == 0
+    pval = "p-value ≤ 0.001"
+else
+    pval = "p-value = $pval"
+end
+plot!(reflNIR, predict(reg), w = 3)
+annotate!(0.405, 138, text("R² = $(round(r2(reg), digits = 2)) \n$pval", :left, 10))
+#annotate!(0.405, 138, text("R² = $(round(r2(reg), digits = 2)) \n$pval \ny = $slope * x + $intercept", :left, 10))
+savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/Radiance_NIR_OCO3_CliMA_Scatter_LAI.pdf")
 
 # Min and Max SZA from oco3 data
 szamin = minimum(oco3_data[:sza])

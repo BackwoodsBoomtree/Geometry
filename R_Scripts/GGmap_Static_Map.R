@@ -77,6 +77,7 @@ build_data <- function (input_file) {
   id <- ncvar_get(df, "Metadata/SoundingId") # "YYYYMMDDHHMMSS"
   time <- ncvar_get(df, "Delta_Time") # seconds since 1990-01-01 00:00:00 UTC
   igbp <- ncvar_get(df, "Science/IGBP_index")
+  percent_cover <- ncvar_get(df, "Science/sounding_land_fraction")
   # SIF and Flag Data
   cloud_flag <- ncvar_get(df, "Cloud/cloud_flag_abp") # 0 - \"Classified clear\", 1 - \"Classified cloudy\", 2 - \"Not classified\", all other values undefined; not used in SIF processing
   q_flag <- ncvar_get(df, "Quality_Flag") # 0 = best (passes quality control + cloud fraction = 0.0); 1 = good (passes quality control); 2 = bad (failed quality control); -1 = not investigated
@@ -137,7 +138,7 @@ build_data <- function (input_file) {
                    "lat_1" = lat1, "lat_2" = lat2, "lat_3" = lat3, "lat_4" = lat4,
                    "sza" = sza, "saa" = saa, "vza" = vza, "vaa" = vaa, "pa" = pa, "raa" = raa,
                    "humidity" = humidity, "surface_pressure" = surface_pressure, "temp_skin" = temp_skin,
-                   "temp_2m" = temp_2m, "vpd" = vpd, "wind" = wind, "igbp_class" = igbp)
+                   "temp_2m" = temp_2m, "vpd" = vpd, "wind" = wind, "igbp_class" = igbp, "percent_cover" = percent_cover)
   df <- na.omit(df) # drop rows that contain an NA anywhere
   # Get time for plot labels and filenaming
   lab_time <<- as.POSIXct((as.numeric(max(df$time)) + as.numeric(min(df$time))) / 2, origin = "1970-01-01", tz = "UTC")
@@ -224,7 +225,9 @@ subset_location <- function (df, lat_min, lat_max, lon_min, lon_max) {
   df <- subset(df, lat_1 > lat_min & lat_1 < lat_max & lon_1 > lon_min & lon_1 < lon_max)
   return(df)
 }
-subset_cover <- function (df, igbp) {
+subset_cover <- function (df, igbp, percent) {
+  df <- subset(df, percent_cover >= percent) # Filter by percent
+  percent <<- percent
   if (is.na(igbp)) {
     lab_class <- "All"
   } else if (igbp == 1) {
@@ -295,35 +298,56 @@ build_polyDF <- function(df) {
     polly <- Polygon(cbind(x, y))
     polly <- Polygons(list(polly), row.names(df[i, ]))
     if (i == 1) {
-      pollyLayer <- SpatialPolygons(list(polly))
+      pollyLayer <- SpatialPolygons(list(polly), proj4string = CRS("+init=epsg:4326"))
     } else {
-      pollyLayer <- SpatialPolygons(c(slot(pollyLayer, "polygons"), list(polly)))
+      pollyLayer <- SpatialPolygons(c(slot(pollyLayer, "polygons"), list(polly)), proj4string = CRS("+init=epsg:4326"))
     }
   }
   # Assign Data to polygons as a spatial polygon DF data type
   poly_df <- SpatialPolygonsDataFrame(pollyLayer, df)
 }
-build_lai <- function (lai_raster, poly_df){
+build_laiCop <- function (cop_data, poly_df){
   # Input LAI raster is from Copernicus (1 km)
-  lai_raster <- brick(lai_raster, varname = "LAI")
-  extent(lai_raster) <- extent(-180, 180, -60, 80)
-  lai_raster <- projectRaster(lai_raster, crs = "+init=epsg:4326")
-  crs(poly_df) <- crs(lai_raster) # Make sure crs match
-  lai_raster <- crop(lai_raster, poly_df) # Crop raster to polygon extent
+  lai_cop <- brick(cop_data, varname = "LAI")
+  #extent(lai_cop) <- extent(-180, 180, -60, 80)
   # Sample LAI raster using OCO footprint polygons and calculate area weighted mean
-  lai_awm <- extract(lai_raster, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)
-  poly_df$lai <- as.vector(lai_awm) # add LAI to shapefile
+  lai_cop <- extract(lai_cop, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)
+  lai_cop <- round(lai_cop, digits = 3)
+  poly_df$lai_cop <- as.vector(lai_cop) # add LAI to shapefile
+  return(poly_df)
+}
+build_laiERA5 <- function (era5_data, poly_df){
+  # To get LAI for a pixel, we need to calculate from high and low vegetation cover
+  high_cover <- brick(era5_data, varname = "cvh")
+  low_cover <- brick(era5_data, varname = "cvl")
+  lai_high <- brick(era5_data, varname = "lai_hv")
+  lai_low <- brick(era5_data, varname = "lai_lv")
+  lai_era5 <- (high_cover * lai_high) + (low_cover * lai_low)
+  # Sample LAI raster using OCO footprint polygons and calculate area weighted mean
+  lai_era5 <- round(as.vector(extract(lai_era5, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)), digits = 3)
+  poly_df$lai_era5 <- lai_era5 # add LAI to shapefile
+  return(poly_df)
+}
+build_incoming_sw_ERA5 <- function (era5_data, poly_df){
+  incoming_sw_era5 <- brick(era5_data, varname = "msdwswrf") # Mean surface downward short-wave radiation flux
+  incoming_direct_era5 <- brick(era5_data, varname = "msdrswrf") # Mean surface downward short-wave radiation flux
+  # Sample LAI raster using OCO footprint polygons and calculate area weighted mean
+  incoming_sw_era5 <- round(as.vector(extract(incoming_sw_era5, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)), digits = 3)
+  incoming_direct_era5 <- round(as.vector(extract(incoming_direct_era5, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)), digits = 3)
+  incoming_diffuse_era5 <- incoming_sw_era5 - incoming_direct_era5
+  # Add to shapefile
+  poly_df$incoming_sw_era5 <- incoming_sw_era5
+  poly_df$incoming_direct_era5 <- incoming_direct_era5
+  poly_df$incoming_diffuse_era5 <- incoming_diffuse_era5
   return(poly_df)
 }
 build_evi <- function (evi_raster, poly_df){
   # Input EVI raster is from VPM input
   evi_raster <- raster(evi_raster)
   evi_raster <- projectRaster(evi_raster, crs = "+init=epsg:4326")
-  crs(poly_df) <- crs(evi_raster) # Make sure crs match
-  evi_raster <- crop(evi_raster, poly_df) # Crop raster to polygon extent
   # Sample LAI raster using OCO footprint polygons and calculate area weighted mean
   evi_awm <- extract(evi_raster, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)
-  evi_awm <- round((evi_awm / 1000), digits = 3)
+  evi_awm <- round((evi_awm / 10000), digits = 3)
   poly_df$evi <- as.vector(evi_awm) # add LAI to shapefile
   return(poly_df)
 }
@@ -406,7 +430,7 @@ plot_data <- function (df, variable, save, site_name, output_dir) {
       breaks = rev(mixedsort(unique(df$categorical))),
       labels = rev(cat_labels)) +
     labs(title = paste0(lab_loc, "\n", lab_time, " | Orbit ", df$orbit[1], " | Mode: ", lab_mode,
-                        "\nLand Cover: ", lab_class, " | QC Filter: ", gsub("_", " ", lab_qc), " | Cloud Filter: ", gsub("_", " ", lab_cloud)),
+                        "\nCover: ", lab_class, " ", percent, "%", " | QC Filter: ", gsub("_", " ", lab_qc), " | Cloud Filter: ", gsub("_", " ", lab_cloud)),
                         fill = lab_var) +
     theme(axis.ticks = element_blank(), axis.title = element_blank(),
           plot.title = element_text(hjust = 0.5), legend.justification = c(0, 1), legend.position = c(1.025, 1))
@@ -488,7 +512,7 @@ df <- build_data(input_dir[5])
 # mode: 0 = Nadir; 1 = Glint; 2 = Target; 3 = SAM; 4 = Transition; 5 = SAM & Target
 # cloud flag: NA = no filter; 0 = clear; 1 = cloudy; 2 = Not classified; 10 = clear and cloudy
 # qc flag: NA = no filter; 0 = best; 1 = good; 2 = bad; -1 = not investigated; 10 = best and good
-df <- subset_flags(df, 5, 0, 10)
+df <- subset_flags(df, 5, 0, 0)
 
 # min lat, max lat, min lon, max lon
 df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
@@ -496,19 +520,23 @@ df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
 #df <- subset_location(df, 34, 38, -100, -94) # Lamont
 
 # IGBP number
-df <- subset_cover(df, 2)
+df <- subset_cover(df, 2, 100)
 #df <- subset_cover(df, "None") # Lamont
 
 poly_df <- build_polyDF(df) # Build shapefile
 
 # Add LAI to shapefile
-poly_df <- build_lai("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202006300000_GLOBE_PROBAV_V2.0.1.nc", poly_df)
+poly_df <- build_laiCop("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202006300000_GLOBE_PROBAV_V2.0.1.nc", poly_df)
+poly_df <- build_laiERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_LAI_SWDOWN_2020-06-26.nc", poly_df)
 
-# Add EVI to polygon
+# Add Shortwave Radiation Downward at the surface
+poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_LAI_SWDOWN_2020-06-26.nc", poly_df)
+
+# Add EVI to shapefile
 poly_df <- build_evi("C:/Russell/Projects/Geometry/Data/evi/GPP.2019177.h12v08.tif", poly_df)
 
 # Arg: SpatialPolygonDF, variable of interest, save to file?, site name, output directory name
-plot_data(poly_df, "evi", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
+plot_data(poly_df, "incoming_diffuse_era5", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
 #plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
 #plot_data(poly_df, "sif740", TRUE, "val_lamontOK", "C:/Russell/R_Scripts/Geometry/")
 
