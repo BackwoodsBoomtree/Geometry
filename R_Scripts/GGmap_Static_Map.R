@@ -329,8 +329,8 @@ build_laiERA5 <- function (era5_data, poly_df){
   return(poly_df)
 }
 build_incoming_sw_ERA5 <- function (era5_data, poly_df){
-  incoming_sw_era5 <- brick(era5_data, varname = "msdwswrf") # Mean surface downward short-wave radiation flux
-  incoming_direct_era5 <- brick(era5_data, varname = "msdrswrf") # Mean surface downward short-wave radiation flux
+  incoming_sw_era5 <- brick(era5_data, varname = "msdwswrfcs") # Mean surface downward short-wave radiation flux, clear sky
+  incoming_direct_era5 <- brick(era5_data, varname = "msdrswrfcs") # Mean surface downward short-wave radiation flux, clear sky
   # Sample LAI raster using OCO footprint polygons and calculate area weighted mean
   incoming_sw_era5 <- round(as.vector(extract(incoming_sw_era5, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)), digits = 3)
   incoming_direct_era5 <- round(as.vector(extract(incoming_direct_era5, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)), digits = 3)
@@ -538,10 +538,9 @@ poly_df <- build_polyDF(df) # Build shapefile
 
 # Add LAI to shapefile
 poly_df <- build_laiCop("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202006300000_GLOBE_PROBAV_V2.0.1.nc", poly_df)
-poly_df <- build_laiERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_LAI_SWDOWN_2020-06-26.nc", poly_df)
 
 # Add Shortwave Radiation Downward at the surface
-poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_LAI_SWDOWN_2020-06-26.nc", poly_df)
+poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-26.nc", poly_df)
 
 # Add Cab
 poly_df <- build_cab("C:/Russell/Projects/Geometry/Data/era5/ERA5_LAI_SWDOWN_2020-06-26.nc", poly_df)

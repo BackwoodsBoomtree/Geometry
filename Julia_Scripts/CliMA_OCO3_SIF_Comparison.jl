@@ -146,8 +146,6 @@ PyPlot.colorbar(label = "SIF740")
 PyPlot.gcf()
 PyPlot.savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/SIF740_OCO3_Polar.pdf")
 
-scatter(SIF_FR, oco3_data[:sif740])
-
 # Scatter Plots
 scatter(SIF_FR, oco3_data[:sif740], xlabel = "CliMA SIF740", ylabel = "OCO3 SIF740", xlims = (2.5, 3.1), ylims = (0, 3.1),
         title = "LAI = 1 km Copernicus, Cab = 60", titlefontsize = 13, legend = false, colorbar = true, framestyle = :box, zcolor = LAI, m = (:viridis, 0.8),
