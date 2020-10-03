@@ -351,6 +351,17 @@ build_evi <- function (evi_raster, poly_df){
   poly_df$evi <- as.vector(evi_awm) # add LAI to shapefile
   return(poly_df)
 }
+build_cab <- function (cab_raster, poly_df){
+  # Input EVI raster is from VPM input
+  cab_raster <- raster(cab_raster)
+  cab_raster <- projectRaster(cab_raster, crs = "+init=epsg:4326")
+  # Sample LAI raster using OCO footprint polygons and calculate area weighted mean
+  evi_awm <- extract(evi_raster, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)
+  evi_awm <- round((evi_awm / 10000), digits = 3)
+  poly_df$evi <- as.vector(evi_awm) # add LAI to shapefile
+  return(poly_df)
+}
+
 plot_data <- function (df, variable, save, site_name, output_dir) {
   register_google(key = "AIzaSyDPeI_hkrch7DqhKmhFJKeADWBpAKJL3h4")
 
@@ -531,6 +542,16 @@ poly_df <- build_laiERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_LAI_SWDOWN
 
 # Add Shortwave Radiation Downward at the surface
 poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_LAI_SWDOWN_2020-06-26.nc", poly_df)
+
+# Add Cab
+poly_df <- build_cab("C:/Russell/Projects/Geometry/Data/era5/ERA5_LAI_SWDOWN_2020-06-26.nc", poly_df)
+cab_raster <- readBin("C:/Russell/Projects/Geometry/Data/chl/Chlmap_phys-GFwith2010-h12v08-20110625_lacc.bin", what = 'integer', signed = FALSE, size = 2, n = 3240000, endian = "little")
+cab_raster <- matrix(data = cab_raster, nrow = 1800, ncol = 1800, byrow = TRUE)
+cab_raster <- raster(cab_raster, crs = "+init=epsg:4326")
+cab_raster[cab_raster > 150] <- NA    # optional to screen out flagged data for visual assessment
+spplot(cab_raster)
+plot(cab_raster)
+cab_raster <- raster("C:/Russell/Projects/Geometry/Data/chl/Chlmap_phys-GFwith2010-h12v08-20110625_lacc.bin")
 
 # Add EVI to shapefile
 poly_df <- build_evi("C:/Russell/Projects/Geometry/Data/evi/GPP.2019177.h12v08.tif", poly_df)
