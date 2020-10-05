@@ -53,9 +53,9 @@ function derive_spectrum()
         # can.iLAI   = 5.7 * can.Ω / can.nLayer;
 
         # change incoming radiation, comment these to see the improvements
-        # in_rad = deepcopy(in_rad_bak);
-        # in_rad.E_direct  .*= _data.incoming_direct_era5[i]  / e_all_dire;
-        # in_rad.E_diffuse .*= _data.incoming_diffuse_era5[i] / e_all_diff;
+        in_rad = deepcopy(in_rad_bak);
+        in_rad.E_direct  .*= _data.incoming_direct_era5[i]  / e_all_dire;
+        in_rad.E_diffuse .*= _data.incoming_diffuse_era5[i] / e_all_diff;
 
         for i in 1:20
             leaves[i].Cab = 60;
@@ -72,6 +72,13 @@ function derive_spectrum()
         mat_REF[i,:] .= can_rad.alb_obs;
         mat_SIF[i,:] .= can_rad.SIF_obs;
     end
+
+    # 742 nm and 737 nm to 740 nm
+    # 757 nm to 757 nm
+    # 767 nm and 774.5 nm to 771 nm
+    _data.sif740_sim = mat_SIF[:,19] .* 0.4 .+ mat_SIF[:,20] .* 0.6;
+    _data.sif757_sim = mat_SIF[:,23];
+    _data.sif771_sim = mat_SIF[:,25] .* 0.4667 .+ mat_SIF[:,26] .* 0.5333;
 
     return mat_REF, mat_SIF, wls.WLF, wls.WL, _data
     #return nothing
@@ -97,65 +104,57 @@ mat_REF, mat_SIF, wlf, wl, data = derive_spectrum()
 # _fig2.colorbar(_cm2, ax=_ax2, label="SIF");
 # _fig2.set_tight_layout(true);
 
-# 742 nm and 737 nm to 740 nm
-# 757 nm to 757 nm
-# 767 nm and 774.5 nm to 771 nm
-data.sif740_sim = mat_SIF[:,19] .* 0.4 .+ mat_SIF[:,20] .* 0.6;
-data.sif757_sim = mat_SIF[:,23];
-data.sif771_sim = mat_SIF[:,25] .* 0.4667 .+ mat_SIF[:,26] .* 0.5333;
-
 # Remove low LAI
 data = data[(data[:lai_cop].>4), :]
 
 # Groups
-dataG1 = data[(data[:raa].<45), :]
-dataG2 = data[((data[:raa].<65) .& (data[:raa].>45)), :]
-dataG3 = data[((data[:raa].<80) .& (data[:raa].>65)), :]
-dataG4 = data[((data[:raa].<135) .& (data[:raa].>90)), :]
-dataG5 = data[((data[:raa].<157) .& (data[:raa].>150) .& (data[:vza].>25)), :]
-dataG6 = data[((data[:raa].<171) .& (data[:raa].>157) .& (data[:vza].>35)), :]
-dataG7 = data[((data[:raa].>174) .& (data[:vza].>40)), :]
-dataG8 = data[((data[:raa].>174) .& (data[:vza].<40)), :]
-dataG9 = data[((data[:raa].<171) .& (data[:raa].>157) .& (data[:vza].<35)), :]
+insertcols!(data, ncol(data)+1, :group => NaN)
+for i in 1:nrow(data)
+    if data[:raa][i] < 45
+        data.group[i] = 1
+    elseif (data[:raa][i] < 65) && (data[:raa][i] > 45)
+        data.group[i] = 2
+    elseif (data[:raa][i] < 80) && (data[:raa][i] > 65)
+        data.group[i] = 3
+    elseif (data[:raa][i] < 135) && (data[:raa][i] >90)
+        data.group[i] = 4
+    elseif (data[:raa][i] < 157) && (data[:raa][i] > 150) && (data[:vza][i] > 25)
+        data.group[i] = 5
+    elseif (data[:raa][i] < 171) && (data[:raa][i] > 157) && (data[:vza][i] > 35)
+        data.group[i] = 6
+    elseif (data[:raa][i] > 174) && (data[:vza][i] > 40)
+        data.group[i] = 7
+    elseif (data[:raa][i] > 174) && (data[:vza][i] < 40)
+        data.group[i] = 8
+    elseif (data[:raa][i] < 171) && (data[:raa][i] > 157) && (data[:vza][i] < 35)
+        data.group[i] = 9
+    end
+end
 
-# Group Means
-dataG1_mean_sif740 = mean(dataG1.sif740)
-dataG1_mean_sif740_sim = mean(dataG1.sif740_sim)
-dataG2_mean_sif740 = mean(dataG2.sif740)
-dataG2_mean_sif740_sim = mean(dataG2.sif740_sim)
-dataG3_mean_sif740 = mean(dataG3.sif740)
-dataG3_mean_sif740_sim = mean(dataG3.sif740_sim)
-dataG4_mean_sif740 = mean(dataG4.sif740)
-dataG4_mean_sif740_sim = mean(dataG4.sif740_sim)
-dataG5_mean_sif740 = mean(dataG5.sif740)
-dataG5_mean_sif740_sim = mean(dataG5.sif740_sim)
-dataG6_mean_sif740 = mean(dataG6.sif740)
-dataG6_mean_sif740_sim = mean(dataG6.sif740_sim)
-dataG7_mean_sif740 = mean(dataG7.sif740)
-dataG7_mean_sif740_sim = mean(dataG7.sif740_sim)
-dataG8_mean_sif740 = mean(dataG8.sif740)
-dataG8_mean_sif740_sim = mean(dataG8.sif740_sim)
-dataG9_mean_sif740 = mean(dataG9.sif740)
-dataG9_mean_sif740_sim = mean(dataG9.sif740_sim)
-
-# Array of Means - Means with n < 10 removed
-mean_sif740 = [dataG1_mean_sif740, dataG2_mean_sif740, dataG3_mean_sif740, dataG4_mean_sif740, dataG5_mean_sif740,
-               dataG6_mean_sif740, dataG7_mean_sif740, dataG9_mean_sif740]
-mean_sif740_sim = [dataG1_mean_sif740_sim, dataG2_mean_sif740_sim, dataG3_mean_sif740_sim, dataG4_mean_sif740_sim, dataG5_mean_sif740_sim,
-                   dataG6_mean_sif740_sim, dataG7_mean_sif740_sim, dataG9_mean_sif740_sim]
-
-# Array of standard errors
-err_sif740 = [std(dataG1.sif740) / sqrt(nrow(dataG1)), std(dataG2.sif740) / sqrt(nrow(dataG2)),
-              std(dataG3.sif740) / sqrt(nrow(dataG3)), std(dataG4.sif740) / sqrt(nrow(dataG4)),
-              std(dataG5.sif740) / sqrt(nrow(dataG5)), std(dataG6.sif740) / sqrt(nrow(dataG6)),
-              std(dataG7.sif740) / sqrt(nrow(dataG7)), std(dataG9.sif740) / sqrt(nrow(dataG9))]
+# Group Means and Standard Error
+mean_sif740 = Float64[]
+mean_sif740_sim = Float64[]
+stderr_sif740 = Float64[]
+for i in 1:length(unique(data.group))
+    if length(data[data[:group] .== [i], :].group) > 9
+        m_sif = mean(data[data[:group] .== [i], :].sif740)
+        m_sif_sim = mean(data[data[:group] .== [i], :].sif740_sim)
+        err_sif = std(data[data[:group] .== [i], :].sif740) / sqrt(nrow(data[data[:group] .== [i], :]))
+        append!(mean_sif740, m_sif)
+        append!(mean_sif740_sim, m_sif_sim)
+        append!(stderr_sif740, err_sif)
+    else
+        println("Group ", i, " excluded with an N of ", length(data[data[:group] .== [i], :].group))
+    end
+end
+println("Number of groups included: ", length(mean_sif740))
 
 # Mean aboslute error
 sif_mae = round(mae(mean_sif740, mean_sif740_sim), digits = 2)
 
 # Mean Scatter
 scatter(mean_sif740_sim, mean_sif740, xlabel = "Mean CliMA SIF740", ylabel = "Mean OCO3 SIF740",
-        title = "LAI = Copernicus, Cab = 60, Radiation = Default", titlefontsize = 13, legend = false, framestyle = :box, yerror = err_sif740)
+        title = "LAI = Copernicus, Cab = 60, Radiation = Default", titlefontsize = 13, legend = false, framestyle = :box, yerror = stderr_sif740)
 df = DataFrame(X = mean_sif740_sim, Y = mean_sif740)
 reg = lm(@formula(Y ~ X), df)
 slope = round(coef(reg)[2], digits = 2)
@@ -167,9 +166,7 @@ else
     pval = "p-value = $pval"
 end
 plot!(mean_sif740_sim, predict(reg), w = 3)
-#plot!(0:3.5,0:3.5)
 annotate!(:topleft, text("R² = $(round(r2(reg), digits = 2)) \nMAE = $sif_mae \n$pval", :left, 10))
-#annotate!(2.51, 2.75, text("R² = $(round(r2(reg), digits = 2)) \n$pval \ny = $slope * x + $intercept", :left, 10))
 savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/SIF740_OCO3_CliMA_Scatter_LAI-COP_Mean.pdf")
 
 # LAI Scatter Plots
