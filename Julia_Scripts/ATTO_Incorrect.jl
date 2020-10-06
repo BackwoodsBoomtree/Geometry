@@ -34,6 +34,7 @@ function derive_spectrum()
     e_all_diff = sum(in_rad_bak.E_diffuse .* wls.dWL) / 1000;
 
     # create a matrix to store the spectrum
+    mat_REF1 = zeros(FT, (length(_data.vza), length(wls.WL)));
     mat_REF = zeros(FT, (length(_data.vza), length(wls.WL)));
     mat_SIF = zeros(FT, (length(_data.vza), length(wls.WLF)));
 
@@ -70,7 +71,7 @@ function derive_spectrum()
         canopy_fluxes!(can, can_opt, can_rad, in_rad, soil, leaves, wls, rt_con);
         SIF_fluxes!(leaves, can_opt, can_rad, can, soil, wls, rt_con, rt_dim);
 
-        mat_REF[i,:] .= can_rad.alb_obs;
+        mat_REF[i,:] .= can_rad.Lo;
         mat_SIF[i,:] .= can_rad.SIF_obs;
     end
 
@@ -179,12 +180,8 @@ mae_sif771 = round(mae(mean_sif771, mean_sif771_sim), digits = 2)
 mae_ref757 = round(mae(mean_ref757, mean_ref757_sim), digits = 2)
 mae_ref771 = round(mae(mean_ref771, mean_ref771_sim), digits = 2)
 
-# oco*1000*1000 
-# W/m^2/sr/µm - OCO3
-# mW m⁻² nm⁻¹ sr⁻¹ - Clima
-
 # Mean Scatter SIF 740, 757, 771
-scatter(mean_sif740_sim, mean_sif740, xlabel = "Mean CliMA SIF (mW m⁻² nm⁻¹ sr⁻¹)", ylabel = "Mean OCO3 SIF (W m⁻² µm⁻¹ sr⁻¹)", reg = true, linewidth = 2,
+scatter(mean_sif740_sim, mean_sif740, xlabel = "Mean CliMA SIF (W m⁻² µm⁻¹ sr⁻¹)", ylabel = "Mean OCO3 SIF (W m⁻² µm⁻¹ sr⁻¹)", reg = true, linewidth = 2,
         title = "LAI = Copernicus, Cab = 60, Radiation = ERA5", titlefontsize = 13, legend = :topleft, label = "740 nm", framestyle = :box, yerror = stderr_sif740)
 scatter!(mean_sif757_sim, mean_sif757, label = "757 nm", reg = true, linewidth = 2, yerror = stderr_sif757)
 scatter!(mean_sif771_sim, mean_sif771, label = "771 nm", reg = true, linewidth = 2, yerror = stderr_sif771)
@@ -208,7 +205,7 @@ annotate!(1.75, 0.7, text("R² = $(round(r2(reg771), digits = 2)) \nMAE = $mae_s
 savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/SIF_OCO3_CliMA_Scatter_LAI-COP_Rad_Mean.pdf")
 
 # Mean Scatter REF757 and 771
-scatter(mean_ref757_sim, mean_ref757, xlabel = "Mean CliMA Reflected Radiance (mW m⁻² nm⁻¹ sr⁻¹)", ylabel = "Mean OCO3 Reflected Radiance (W m⁻² µm⁻¹ sr⁻¹)", reg = true, linewidth = 2,
+scatter(mean_ref757_sim, mean_ref757, xlabel = "Mean CliMA Reflected Radiance (W m⁻² µm⁻¹ sr⁻¹)", ylabel = "Mean OCO3 Reflected Radiance (W m⁻² µm⁻¹ sr⁻¹)", reg = true, linewidth = 2,
         title = "LAI = Copernicus, Cab = 60, Radiation = ERA5", titlefontsize = 13, legend = :topleft, label = "757 nm", framestyle = :box, yerror = stderr_ref757)
 scatter!(mean_ref771_sim, mean_ref771, label = "771 nm", reg = true, linewidth = 2, yerror = stderr_ref771)
 df757, df771 = DataFrame(X = mean_ref757_sim, Y = mean_ref757), DataFrame(X = mean_ref771_sim, Y = mean_ref771)
@@ -223,8 +220,8 @@ else
     pval757 = "p-value = $pval"
     pval771 = "p-value = $pval"
 end
-annotate!(0.41, 70, text("R² = $(round(r2(reg757), digits = 2)) \nMAE = $mae_ref757 \n$pval757", :left, 10))
-annotate!(0.46, 70, text("R² = $(round(r2(reg771), digits = 2)) \nMAE = $mae_ref771 \n$pval771", :left, 10))
+annotate!(152, 70, text("R² = $(round(r2(reg757), digits = 2)) \nMAE = $mae_ref757 \n$pval757", :left, 10))
+annotate!(147.5, 95, text("R² = $(round(r2(reg771), digits = 2)) \nMAE = $mae_ref771 \n$pval771", :left, 10))
 savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/REF_OCO3_CliMA_Scatter_LAI-COP_Rad_Mean.pdf")
 
 # Polar plot mean CliMA 757 reflectance
@@ -234,7 +231,7 @@ PyPlot.subplot(1,1,1, polar=true)
 PyPlot.grid(true)
 hm = PyPlot.scatter(deg2rad.(mean_raa), mean_vza, c = mean_ref757_sim, cmap = :viridis, zorder = 10)
 PyPlot.title("Mean CliMA Reflected Radiance 757 nm (SZA 28.4 - 30.3)")
-PyPlot.colorbar(label = "Reflectance")
+PyPlot.colorbar(label = "Reflectance (W m⁻² µm⁻¹ sr⁻¹)")
 PyPlot.gcf()
 PyPlot.savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/CliMA_Reflectance_757_Polar.pdf")
 
@@ -244,7 +241,7 @@ PyPlot.subplot(1,1,1, polar=true)
 PyPlot.grid(true)
 hm = PyPlot.scatter(deg2rad.(mean_raa), mean_vza, c = mean_ref757, cmap = :viridis, zorder = 10)
 PyPlot.title("Mean OCO-3 Reflected Radiance 757 nm (SZA 28.4 - 30.3)")
-PyPlot.colorbar(label = "Reflectance")
+PyPlot.colorbar(label = "Reflectance (W m⁻² µm⁻¹ sr⁻¹)")
 PyPlot.gcf()
 PyPlot.savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/OCO-3_Reflectance_757_Polar.pdf")
 
@@ -253,7 +250,38 @@ PyPlot.figure(figsize = (10,5))
 PyPlot.subplot(1,1,1, polar=true)
 PyPlot.grid(true)
 hm = PyPlot.scatter(deg2rad.(mean_raa), mean_vza, c = (mean_ref757 - mean_ref757_sim), cmap = :viridis, zorder = 10)
-PyPlot.title("Mean OCO-3 Reflected Radiance 757 nm (SZA 28.4 - 30.3)")
-PyPlot.colorbar(label = "Reflectance")
+PyPlot.title("Difference in Mean OCO-3 and CliMA Reflected Radiance 757 nm (SZA 28.4 - 30.3)")
+PyPlot.colorbar(label = "Reflectance (W m⁻² µm⁻¹ sr⁻¹)")
 PyPlot.gcf()
 PyPlot.savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/OCO-3_Reflectance_757_Polar.pdf")
+
+# Polar plot mean CliMA 740 SIF
+pyplot()
+PyPlot.figure(figsize = (10,5))
+PyPlot.subplot(1,1,1, polar=true)
+PyPlot.grid(true)
+hm = PyPlot.scatter(deg2rad.(mean_raa), mean_vza, c = mean_sif740_sim, cmap = :viridis, zorder = 10)
+PyPlot.title("Mean CliMA SIF 740 nm (SZA 28.4 - 30.3)")
+PyPlot.colorbar(label = "SIF 740 nm (W m⁻² µm⁻¹ sr⁻¹)")
+PyPlot.gcf()
+PyPlot.savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/CliMA_SIF740_Polar.pdf")
+
+# Polar plot mean OCO3 740 SIF
+PyPlot.figure(figsize = (10,5))
+PyPlot.subplot(1,1,1, polar=true)
+PyPlot.grid(true)
+hm = PyPlot.scatter(deg2rad.(mean_raa), mean_vza, c = mean_sif740, cmap = :viridis, zorder = 10)
+PyPlot.title("Mean OCO-3 SIF 740 nm (SZA 28.4 - 30.3)")
+PyPlot.colorbar(label = "SIF 740 nm (W m⁻² µm⁻¹ sr⁻¹)")
+PyPlot.gcf()
+PyPlot.savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/OCO-3_SIF740_Polar.pdf")
+
+# Polar plot difference 740 SIF
+PyPlot.figure(figsize = (10,5))
+PyPlot.subplot(1,1,1, polar=true)
+PyPlot.grid(true)
+hm = PyPlot.scatter(deg2rad.(mean_raa), mean_vza, c = (mean_sif740 - mean_sif740_sim), cmap = :viridis, zorder = 10)
+PyPlot.title("Difference in Mean OCO-3 and CliMA SIF 740 nm (SZA 28.4 - 30.3)")
+PyPlot.colorbar(label = "SIF 740 nm (W m⁻² µm⁻¹ sr⁻¹)")
+PyPlot.gcf()
+PyPlot.savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/OCO-3_SIF740_Polar.pdf")
