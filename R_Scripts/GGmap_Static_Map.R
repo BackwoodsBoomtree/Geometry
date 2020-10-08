@@ -12,7 +12,8 @@ library(rgdal)
 options(scipen = 999)
 options(digits = 14)
 
-input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ecostress_us_syv", full.names = TRUE, pattern = "*.nc4")
+input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
+# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ecostress_us_syv", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/oco3/Lamont", full.names = TRUE, pattern = "*.nc4")
 target_list <- read.csv("C:/Russell/Projects/Geometry/Data/oco3/site_list/oco3_targets.csv")
@@ -226,6 +227,10 @@ subset_location <- function (df, lat_min, lat_max, lon_min, lon_max) {
   df <- subset(df, lat_1 > lat_min & lat_1 < lat_max & lon_1 > lon_min & lon_1 < lon_max)
   return(df)
 }
+subset_orbit <- function (df, orbit_num) {
+  df <- subset(df, orbit == orbit_num)
+  return(df)
+}
 subset_cover <- function (df, igbp, percent) {
   if (!is.na(percent)) {
     df <- subset(df, percent_cover >= percent) # Filter by percent
@@ -356,7 +361,7 @@ build_evi <- function (evi_raster, poly_df){
   poly_df$evi <- as.vector(evi_awm) # add LAI to shapefile
   return(poly_df)
 }
-plot_data <- function (df, variable, save, site_name, output_dir) {
+plot_data <- function (df, variable, save, site_name, output_dir, offset) {
   register_google(key = "AIzaSyDPeI_hkrch7DqhKmhFJKeADWBpAKJL3h4")
 
   # Labels for plotting
@@ -412,7 +417,7 @@ plot_data <- function (df, variable, save, site_name, output_dir) {
   y_max <- max(c(df$lat_1, df$lat_2, df$lat_3, df$lat_4))
   # Make bounding box for calculating autozoom
   map_bb <- make_bbox(c(x_min, x_max), c(y_min, y_max))
-  autozoom <- calc_zoom(map_bb)
+  autozoom <- calc_zoom(map_bb) + offset
   # Center Point
   x_length <- abs(x_max - x_min)
   y_length <- abs(y_max - y_min)
@@ -506,43 +511,51 @@ df <- build_data(input_dir[1])
 # mode: 0 = Nadir; 1 = Glint; 2 = Target; 3 = SAM; 4 = Transition; 5 = SAM & Target
 # cloud flag: NA = no filter; 0 = clear; 1 = cloudy; 2 = Not classified; 10 = clear and cloudy
 # qc flag: NA = no filter; 0 = best; 1 = good; 2 = bad; -1 = not investigated; 10 = best and good
-df <- subset_flags(df, 5, 0, 0)
+df <- subset_flags(df, 3, 0, 0)
 
 # min lat, max lat, min lon, max lon
-df <- subset_location(df, 45.4, 47.4, -92, -88) # ecostress_us_syv
+df <- subset_location(df, 39, 42, -108, -104) # niwot
 # df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
 # f <- subset_location(df, 35, 37, 139, 141) # Tokyo
 # df <- subset_location(df, 34, 38, -100, -94) # Lamont
 
 # IGBP number and percent
-df <- subset_cover(df, NA, NA) # ecostress_us_syv
+df <- subset_cover(df, 1, NA) # niwot
+# df <- subset_cover(df, NA, NA) # ecostress_us_syv
 # df <- subset_cover(df, 2, 100) # Amazon
 # df <- subset_cover(df, "None") # Lamont
 
-poly_df <- build_polyDF(df) # Build shapefile
+# Orbit number
+# df_6283 <- subset_orbit(df, 6283)
+df_6287 <- subset_orbit(df, 6287)
+
+poly_df <- build_polyDF(df_6283) # Build shapefile
 
 # Add LAI to shapefile
 poly_df <- build_laiCop("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202006300000_GLOBE_PROBAV_V2.0.1.nc", poly_df)
 
 # Add Shortwave Radiation Downward at the surface
-poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-17.nc", poly_df) # ATTO - incorrect
+poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_1700.nc", poly_df) # niwot
+# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-17.nc", poly_df) # ecostress_us_syv
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-26.nc", poly_df) # ATTO - incorrect
 
 # Add EVI to shapefile
 # poly_df <- build_evi("C:/Russell/Projects/Geometry/Data/evi/GPP.2019177.h12v08.tif", poly_df)
 
-# Arg: SpatialPolygonDF, variable of interest, save to file?, site name, output directory name
-plot_data(poly_df, "sza", TRUE, "ecostress_us_syv", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
+# Arg: SpatialPolygonDF, variable of interest, save to file?, site name, output directory name, offset autozoom
+plot_data(poly_df, "sif740", TRUE, "Niwot", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1)
+# plot_data(poly_df, "sif740", TRUE, "ecostress_us_syv", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
 # plot_data(poly_df, "sif740", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
 # plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
 # plot_data(poly_df, "sif740", TRUE, "val_lamontOK", "C:/Russell/R_Scripts/Geometry/")
 
 # Export df to csv
-write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ecostress_us_syv_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
+write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_niwot_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$orbit[1], ".csv"), row.names = FALSE)
+# write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ecostress_us_syv_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
 # write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
 
 # Export to shapefile
-shapefile(poly_df, paste0("C:/Russell/Projects/Geometry/R_Scripts/SHP/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), ".shp"), overwrite = TRUE)
+shapefile(poly_df, paste0("C:/Russell/Projects/Geometry/R_Scripts/SHP/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$orbit[1], ".shp"), overwrite = TRUE)
 
 
 
