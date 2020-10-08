@@ -12,8 +12,9 @@ library(rgdal)
 options(scipen = 999)
 options(digits = 14)
 
-input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
-#input_dir <- list.files(path = "C:/Russell/Projects/Geometry/oco3/Lamont", full.names = TRUE, pattern = "*.nc4")
+input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ecostress_us_syv", full.names = TRUE, pattern = "*.nc4")
+# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
+# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/oco3/Lamont", full.names = TRUE, pattern = "*.nc4")
 target_list <- read.csv("C:/Russell/Projects/Geometry/Data/oco3/site_list/oco3_targets.csv")
 
 #### FUNCTIONS ####
@@ -226,8 +227,12 @@ subset_location <- function (df, lat_min, lat_max, lon_min, lon_max) {
   return(df)
 }
 subset_cover <- function (df, igbp, percent) {
-  df <- subset(df, percent_cover >= percent) # Filter by percent
-  percent <<- percent
+  if (!is.na(percent)) {
+    df <- subset(df, percent_cover >= percent) # Filter by percent
+    lab_percent <<- paste0(percent, "%")
+  } else if (is.na(percent)) {
+    lab_percent <<- paste0("")
+  }
   if (is.na(igbp)) {
     lab_class <- "All"
   } else if (igbp == 1) {
@@ -399,54 +404,43 @@ plot_data <- function (df, variable, save, site_name, output_dir) {
   df$id <- rownames(df@data)
   df_fort <- fortify(df, region = "id") # id column here is a unique identifier for each row
   df_plot <- merge(df_fort, df@data, by = "id")
-  # list_return <- list("df" = df)
-  # list2env(list_return ,.GlobalEnv)
   #### Plot ####
   # Get min and max lat and lon
   x_min <- min(c(df$lon_1, df$lon_2, df$lon_3, df$lon_4))
   x_max <- max(c(df$lon_1, df$lon_2, df$lon_3, df$lon_4))
   y_min <- min(c(df$lat_1, df$lat_2, df$lat_3, df$lat_4))
   y_max <- max(c(df$lat_1, df$lat_2, df$lat_3, df$lat_4))
+  # Make bounding box for calculating autozoom
+  map_bb <- make_bbox(c(x_min, x_max), c(y_min, y_max))
+  autozoom <- calc_zoom(map_bb)
   # Center Point
-  center_point <- c(lon = (x_min + x_max) / 2, lat = (y_min + y_max) / 2)
-  # Bounding Box - To make a square, find longest axis and match their lengths
   x_length <- abs(x_max - x_min)
   y_length <- abs(y_max - y_min)
-  if (x_length > y_length) {
-    y_center <- (y_min + y_max) / 2
-    map_bb <- make_bbox(c(x_min, x_max), c((y_center - (x_length / 2)), (y_center + (x_length / 2))))
-  } else {
-    x_center <- (x_min + x_max) / 2
-    map_bb <- make_bbox(c((x_center - (y_length / 2)), (x_center + (y_length / 2))), c(y_min, y_max))
-  }
-  autozoom <- calc_zoom(map_bb)
-  # Blank map (used to initialize view ports)
-  #map_bg <- ggplot() + theme_void()
+  center_point <- c(lon = (x_min + (0.5 * x_length)), lat = (y_min + (0.5 * y_length)))
   # Main map
-  map_main <- ggmap(get_map(c(map_bb[1], map_bb[2], map_bb[3], map_bb[4]), source = "stamen", maptype="terrain-background", zoom = autozoom)) +
+  map_main <- ggmap(get_map(location = c(lon = as.numeric(center_point[1]), lat = as.numeric(center_point[2])), source = "google", maptype="satellite", zoom = autozoom)) +
     geom_polygon(data = df_plot, aes(x = long, y = lat, group = group, fill = factor(categorical))) +
     scale_fill_manual(
-      values = rev(viridis(length(unique(df$categorical)))),
+      values = rev(plasma(length(unique(df$categorical)))),
       breaks = rev(mixedsort(unique(df$categorical))),
       labels = rev(cat_labels)) +
     labs(title = paste0(lab_loc, "\n", lab_time, " | Orbit ", df$orbit[1], " | Mode: ", lab_mode,
-                        "\nCover: ", lab_class, " ", percent, "%", " | QC Filter: ", gsub("_", " ", lab_qc), " | Cloud Filter: ", gsub("_", " ", lab_cloud)),
+                        "\nCover: ", lab_class, " ", lab_percent, " | QC Filter: ", gsub("_", " ", lab_qc), " | Cloud Filter: ", gsub("_", " ", lab_cloud)),
                         fill = lab_var) +
-    theme(axis.ticks = element_blank(), axis.title = element_blank(),
-          plot.title = element_text(hjust = 0.5), legend.justification = c(0, 1), legend.position = c(1.025, 1))
+    theme(axis.ticks = element_blank(), axis.title = element_blank(), panel.border = element_rect(colour = "black", fill=NA),
+          plot.title = element_text(hjust = 0.5), legend.justification = c(0, 1), legend.position = c(1.025, 1), legend.key.size = unit(1.5, 'lines'))
   # Inset map
-  map_loc <- ggmap(get_map(location = c(lon = as.numeric(center_point[1]), lat = as.numeric(center_point[2])), source = "stamen",
-                            maptype="terrain-background", zoom = 4)) +
+  map_loc <- ggmap(get_map(location = c(lon = as.numeric(center_point[1]), lat = as.numeric(center_point[2])), source = "google", maptype = "satellite", zoom = 3)) +
     scale_x_continuous(expand = c(0, 0)) +
     scale_y_continuous(expand = expansion(mult = c(0, 0))) +
-    geom_point(aes(x = as.numeric(center_point[1]), y = as.numeric(center_point[2])), alpha = .5, color = "#8e0152", size = 3, shape=16, show.legend = FALSE) +
-    theme(axis.ticks = element_blank(), axis.title = element_blank(), axis.text = element_blank(), plot.title = element_blank())
+    geom_point(aes(x = as.numeric(center_point[1]), y = as.numeric(center_point[2])), color = "white", size = 2, shape = 21, fill = "#c51b7d", show.legend = FALSE) +
+    theme(axis.ticks = element_blank(), axis.title = element_blank(), axis.text = element_blank(), plot.title = element_blank(), panel.border = element_rect(colour = "black", fill = NA))
   # Histogram or Bar
   if (variable == "igbp_class"){
-    h <- ggplot(df@data, aes(x=factor(igbp_class), fill=factor(igbp_class))) + xlab(lab_var) +
+    h <- ggplot(df@data, aes(x = factor(igbp_class), fill=factor(igbp_class))) + xlab(lab_var) +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(
-        values = viridis(length(unique(df$categorical)))) +
+        values = plasma(length(unique(df$categorical)))) +
       scale_y_continuous(expand = expansion(mult = c(0, .1))) +
       theme(panel.border = element_rect(colour = "black", fill=NA), panel.background = element_blank(),
             axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
@@ -457,7 +451,7 @@ plot_data <- function (df, variable, save, site_name, output_dir) {
     h <- ggplot(df@data, aes(x = factor(cloud_flag), fill=factor(cloud_flag))) + xlab(lab_var) +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(
-        values = viridis(length(unique(df$categorical)))) +
+        values = plasma(length(unique(df$categorical)))) +
       scale_y_continuous(expand = expansion(mult = c(0, .1))) +
       theme(panel.border = element_rect(colour = "black", fill = NA), panel.background = element_blank(),
             axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
@@ -468,7 +462,7 @@ plot_data <- function (df, variable, save, site_name, output_dir) {
     h <- ggplot(df@data, aes(x=factor(quality_flag), fill=factor(quality_flag))) + xlab(lab_var) +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(
-        values = viridis(length(unique(df$categorical)))) +
+        values = plasma(length(unique(df$categorical)))) +
       scale_y_continuous(expand = expansion(mult = c(0, .1))) +
       theme(panel.border = element_rect(colour = "black", fill = NA), panel.background = element_blank(),
             axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
@@ -506,7 +500,7 @@ plot_data <- function (df, variable, save, site_name, output_dir) {
 }
 
 #### PLOTTING SITES ####
-df <- build_data(input_dir[5])
+df <- build_data(input_dir[1])
 
 # Args: input df, mode, cloud flag, qc flag
 # mode: 0 = Nadir; 1 = Glint; 2 = Target; 3 = SAM; 4 = Transition; 5 = SAM & Target
@@ -515,13 +509,15 @@ df <- build_data(input_dir[5])
 df <- subset_flags(df, 5, 0, 0)
 
 # min lat, max lat, min lon, max lon
-df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
-#df <- subset_location(df, 35, 37, 139, 141) # Tokyo
-#df <- subset_location(df, 34, 38, -100, -94) # Lamont
+df <- subset_location(df, 45.4, 47.4, -92, -88) # ecostress_us_syv
+# df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
+# f <- subset_location(df, 35, 37, 139, 141) # Tokyo
+# df <- subset_location(df, 34, 38, -100, -94) # Lamont
 
-# IGBP number
-df <- subset_cover(df, 2, 100)
-#df <- subset_cover(df, "None") # Lamont
+# IGBP number and percent
+df <- subset_cover(df, NA, NA) # ecostress_us_syv
+# df <- subset_cover(df, 2, 100) # Amazon
+# df <- subset_cover(df, "None") # Lamont
 
 poly_df <- build_polyDF(df) # Build shapefile
 
@@ -529,18 +525,21 @@ poly_df <- build_polyDF(df) # Build shapefile
 poly_df <- build_laiCop("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202006300000_GLOBE_PROBAV_V2.0.1.nc", poly_df)
 
 # Add Shortwave Radiation Downward at the surface
-poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-26.nc", poly_df)
+poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-17.nc", poly_df) # ATTO - incorrect
+# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-26.nc", poly_df) # ATTO - incorrect
 
 # Add EVI to shapefile
-poly_df <- build_evi("C:/Russell/Projects/Geometry/Data/evi/GPP.2019177.h12v08.tif", poly_df)
+# poly_df <- build_evi("C:/Russell/Projects/Geometry/Data/evi/GPP.2019177.h12v08.tif", poly_df)
 
 # Arg: SpatialPolygonDF, variable of interest, save to file?, site name, output directory name
-plot_data(poly_df, "incoming_diffuse_era5", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
-#plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
-#plot_data(poly_df, "sif740", TRUE, "val_lamontOK", "C:/Russell/R_Scripts/Geometry/")
+plot_data(poly_df, "sza", TRUE, "ecostress_us_syv", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
+# plot_data(poly_df, "sif740", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
+# plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
+# plot_data(poly_df, "sif740", TRUE, "val_lamontOK", "C:/Russell/R_Scripts/Geometry/")
 
 # Export df to csv
-write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
+write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ecostress_us_syv_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
+# write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
 
 # Export to shapefile
 shapefile(poly_df, paste0("C:/Russell/Projects/Geometry/R_Scripts/SHP/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), ".shp"), overwrite = TRUE)
@@ -570,7 +569,7 @@ poly_multi <- build_polyDF(df)
 plot_data(poly_multi, variable, save, site_name, output_dir)
 
 #### Multi vza ####
-cols <- viridis(length(input_dir) * 3)
+cols <- plasma(length(input_dir) * 3)
 cols <- cols[c(TRUE, FALSE, FALSE)] # Remove every other color
 par(xpd = TRUE)
 plot(NA, xlim = c(0, 60), ylim = c(-2.75, 6), xlab = "vza", ylab = "sif740")
@@ -603,7 +602,7 @@ legend(0, 7.25, legend = legend_text, text.col = text_cols, text.font = 2)
 remove(legend_text)
 
 #### Multi pa ####
-cols <- viridis(length(input_dir) * 3)
+cols <- plasma(length(input_dir) * 3)
 cols <- cols[c(TRUE, FALSE, FALSE)] # Remove every other color
 plot(NA, xlim = c(0, 70), ylim = c(-2.75, 6), xlab = "pa", ylab = "sif740")
 for (i in 1:length(input_dir)) {
@@ -633,7 +632,7 @@ legend(0, 7.25, legend = legend_text, text.col = text_cols, text.font = 2)
 remove(legend_text)
 
 #### Multi raa ####
-cols <- viridis(length(input_dir) * 3)
+cols <- plasma(length(input_dir) * 3)
 cols <- cols[c(TRUE, FALSE, FALSE)] # Remove every other color
 plot(NA, xlim = c(0, 180), ylim = c(-2.75, 6), xlab = "raa", ylab = "sif740")
 for (i in 1:length(input_dir)) {
