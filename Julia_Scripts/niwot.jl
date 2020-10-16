@@ -6,8 +6,26 @@ using Plots
 using Plots.PlotMeasures
 using GLM
 using Statistics
+using GriddingMachine
+using Images
 
 struct SIFComparison2020{FT} end
+FT=Float32;
+# CLI_LUT = load_LUT(ClumpingIndexMODIS{FT}(), "C:/Russell/Projects/Geometry/Data/lut/global_clumping_index.tif", GriddingMachine.FormatTIFF(), 1, "1Y", false);
+# clumping_index = read_LUT(CLI_LUT, FT(36), FT(-107))
+
+CLI_PFT = load_LUT(ClumpingIndexPFT{FT}(), "C:/Russell/Projects/Geometry/Data/lut/clumping_factor_pft.nc", GriddingMachine.FormatNC(), "clump", "1Y", false);
+clumping_index = read_LUT(CLI_PFT, FT(36), FT(-107), 2)
+
+
+LAI_LUT = load_LUT(LAIMonthlyMean{FT}());
+# read the lai at lat=30, lon=-100, month=Augest
+lai_val = read_LUT(LAI_LUT, FT(30), FT(-100), 8);
+@show lai_val;
+
+# Plot to check
+# CLI_PFT_test = CLI_PFT.data[1:end, 1:end, 2]
+# Gray.(CLI_PFT_test)
 
 """
     derive_spectrum()
@@ -41,6 +59,7 @@ function derive_spectrum(input_data)
         angles.tto = input_data.vza[i];
 
         # change the canopy profiles
+        can.Ω = read_LUT(CLI_PFT, FT(input_data.lat[i]), FT(input_data.lon[i]), 2)
         can.LAI    = input_data.lai_cop[i];
         can.iLAI   = input_data.lai_cop[i] * can.Ω / can.nLayer;
 
@@ -83,14 +102,14 @@ function derive_spectrum(input_data)
 end
 
 file1 = "C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_niwot_2020-06-12_6283.csv"
-# file2 = "C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_niwot_2020-06-12_6287.csv"
-# input1 = DataFrame!(CSV.File(file1));
-# input2 = DataFrame!(CSV.File(file2));
-# input_data = vcat(input1, input2)
+file2 = "C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_niwot_2020-06-12_6287.csv"
+input1 = DataFrame!(CSV.File(file1));
+input2 = DataFrame!(CSV.File(file2));
+input_data = vcat(input1, input2)
 input_data = DataFrame!(CSV.File(file1));
 
 # Run model
-mat_REF, mat_SIF, wlf, wl, df = derive_spectrum(input_data)
+mat_REF, mat_SIF, wlf, wl, df = derive_spectrum(input2)
 
 # Remove low LAI
 # df = df[(df[:lai_cop].>4), :]
@@ -173,11 +192,11 @@ end
 println("Number of groups included: ", length(mean_sif740))
 
 # Mean aboslute error
-mae_sif740 = round(mae(mean_sif740, mean_sif740_sim), digits = 2)
-mae_sif757 = round(mae(mean_sif757, mean_sif757_sim), digits = 2)
-mae_sif771 = round(mae(mean_sif771, mean_sif771_sim), digits = 2)
-mae_ref757 = round(mae(mean_ref757, mean_ref757_sim), digits = 2)
-mae_ref771 = round(mae(mean_ref771, mean_ref771_sim), digits = 2)
+mae_sif740 = round(PlotPlants.mae(mean_sif740, mean_sif740_sim), digits = 2)
+mae_sif757 = round(PlotPlants.mae(mean_sif757, mean_sif757_sim), digits = 2)
+mae_sif771 = round(PlotPlants.mae(mean_sif771, mean_sif771_sim), digits = 2)
+mae_ref757 = round(PlotPlants.mae(mean_ref757, mean_ref757_sim), digits = 2)
+mae_ref771 = round(PlotPlants.mae(mean_ref771, mean_ref771_sim), digits = 2)
 
 # Mean Scatter SIF 740, 757, 771
 scatter(mean_sif740_sim, mean_sif740, xlabel = "Mean CliMA SIF (W m⁻² µm⁻¹ sr⁻¹)", ylabel = "Mean OCO3 SIF (W m⁻² µm⁻¹ sr⁻¹)", reg = true, linewidth = 2,

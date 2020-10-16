@@ -1,6 +1,11 @@
 [deps]
+ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
 CanopyLayers = "677f5362-5107-42e4-8e81-51d9c4a1f96c"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+GriddingMachine = "f20cf718-bf4d-4727-bc8f-485b1f283ac6"
+ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
+ImageMagick = "6218d12a-5da1-5696-b52f-db25d2ecc6d1"
+Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 PlotPlants = "62700b34-1872-4917-b6af-4f42ae699f38"
 SplitApplyCombine = "03a91e81-4c3e-53e1-a0a4-9c0c8f19dd66"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"

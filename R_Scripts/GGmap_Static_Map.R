@@ -7,12 +7,18 @@ library(sp)
 library(gtools)
 library(raster)
 library(rgdal)
-
+library(lutz)
+library(data.table)
+library(extrafont)
+font_import()
+loadfonts()
+fonts()
 
 options(scipen = 999)
 options(digits = 14)
 
-input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
+input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/mzo", full.names = TRUE, pattern = "*.nc4")
+# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ecostress_us_syv", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/oco3/Lamont", full.names = TRUE, pattern = "*.nc4")
@@ -96,6 +102,8 @@ build_data <- function (input_file) {
   rad757 <- ncvar_get(df, "Science/continuum_radiance_757nm")
   rad771 <- ncvar_get(df, "Science/continuum_radiance_771nm")
   # Geo Data
+  lon_center <- ncvar_get(df, "Geolocation/longitude")
+  lat_center <- ncvar_get(df, "Geolocation/latitude")
   lon_corners <- ncvar_get(df, "Geolocation/footprint_longitude_vertices")
   lat_corners <- ncvar_get(df, "Geolocation/footprint_latitude_vertices")
   sza <- ncvar_get(df, "SZA")
@@ -131,7 +139,7 @@ build_data <- function (input_file) {
   pa <- compute_phase_angle(pa_table)
 
   df <- data.frame("sid" = id, "mode" = mode, "orbit" = orbit, "cloud_flag" = cloud_flag, "quality_flag" = q_flag,
-                   "time" = as.POSIXct(time, origin = "1990-01-01", tz = "UTC"),
+                   "time" = as.POSIXct(time, origin = "1990-01-01", tz = "UTC"), "lon_center" = lon_center, "lat_center" = lat_center,
                    "sif740_D" = sif740_D, "sif757_D" = sif757_D, "sif771_D" = sif771_D,
                    "sif740" = sif740, "sif740_U" = sif740_U,
                    "sif757" = sif757, "sif757_U" = sif757_U, "rad757" = rad757,
@@ -142,8 +150,6 @@ build_data <- function (input_file) {
                    "humidity" = humidity, "surface_pressure" = surface_pressure, "temp_skin" = temp_skin,
                    "temp_2m" = temp_2m, "vpd" = vpd, "wind" = wind, "igbp_class" = igbp, "percent_cover" = percent_cover)
   df <- na.omit(df) # drop rows that contain an NA anywhere
-  # Get time for plot labels and filenaming
-  lab_time <<- as.POSIXct((as.numeric(max(df$time)) + as.numeric(min(df$time))) / 2, origin = "1970-01-01", tz = "UTC")
   return(df)
 }
 build_data_multi <- function (input_dir) {
@@ -364,11 +370,15 @@ build_evi <- function (evi_raster, poly_df){
 plot_data <- function (df, variable, save, site_name, output_dir, offset) {
   register_google(key = "AIzaSyDPeI_hkrch7DqhKmhFJKeADWBpAKJL3h4")
 
+  # Get row from site list for target site
+  target_loc <- target_list[target_list$Target.Name %like% site_name, ]
+
   # Labels for plotting
   lab_loc <- gsub("_", " ", site_name)
   lab_var <- sapply(gsub("_", " ", variable), toupper)
   if (variable == "igbp_class") {
     df$categorical <- df[[variable]]
+    df$categorical <- gsub("\\<0\\>", "0 - Unclassified", df$categorical)
     df$categorical <- gsub("\\<1\\>", "1 - Evergreen NF", df$categorical)
     df$categorical <- gsub("\\<2\\>", "2 - Evergreen BF", df$categorical)
     df$categorical <- gsub("\\<3\\>", "3 - Deciduous NF", df$categorical)
@@ -422,6 +432,10 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
   x_length <- abs(x_max - x_min)
   y_length <- abs(y_max - y_min)
   center_point <- c(lon = (x_min + (0.5 * x_length)), lat = (y_min + (0.5 * y_length)))
+  # Time Zone
+  time_zone <- tz_lookup_coords(as.numeric(center_point[2]), as.numeric(center_point[1]), "accurate")
+  lab_time <- as.POSIXct((as.numeric(max(df$time)) + as.numeric(min(df$time))) / 2, origin = "1970-01-01", tz = "UTC")
+  lab_time <- format(lab_time, tz = time_zone, usetz = TRUE)
   # Main map
   map_main <- ggmap(get_map(location = c(lon = as.numeric(center_point[1]), lat = as.numeric(center_point[2])), source = "google", maptype="satellite", zoom = autozoom)) +
     geom_polygon(data = df_plot, aes(x = long, y = lat, group = group, fill = factor(categorical))) +
@@ -433,12 +447,15 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
                         "\nCover: ", lab_class, " ", lab_percent, " | QC Filter: ", gsub("_", " ", lab_qc), " | Cloud Filter: ", gsub("_", " ", lab_cloud)),
                         fill = lab_var) +
     theme(axis.ticks = element_blank(), axis.title = element_blank(), panel.border = element_rect(colour = "black", fill=NA),
-          plot.title = element_text(hjust = 0.5), legend.justification = c(0, 1), legend.position = c(1.025, 1), legend.key.size = unit(1.5, 'lines'))
+          plot.title = element_text(hjust = 0.5), legend.justification = c(0, 1), legend.position = c(1.025, 1), legend.key.size = unit(1.0, 'lines')) +
+    geom_point(aes(x = as.numeric(target_loc$Lon[1]), y = as.numeric(target_loc$Lat[1])), color = "black", size = 4, shape = 21, fill = "white", show.legend = FALSE) +
+    geom_point(aes(x = as.numeric(target_loc$Lon[1]), y = as.numeric(target_loc$Lat[1])), color = "black", size = 1, shape = 16, show.legend = FALSE)
   # Inset map
   map_loc <- ggmap(get_map(location = c(lon = as.numeric(center_point[1]), lat = as.numeric(center_point[2])), source = "google", maptype = "satellite", zoom = 3)) +
     scale_x_continuous(expand = c(0, 0)) +
     scale_y_continuous(expand = expansion(mult = c(0, 0))) +
-    geom_point(aes(x = as.numeric(center_point[1]), y = as.numeric(center_point[2])), color = "white", size = 2, shape = 21, fill = "#c51b7d", show.legend = FALSE) +
+    geom_point(aes(x = as.numeric(center_point[1]), y = as.numeric(center_point[2])), color = "black", size = 3, shape = 21, fill = "white", show.legend = FALSE) +
+    geom_point(aes(x = as.numeric(center_point[1]), y = as.numeric(center_point[2])), color = "black", size = 0.75, shape = 16, show.legend = FALSE) +
     theme(axis.ticks = element_blank(), axis.title = element_blank(), axis.text = element_blank(), plot.title = element_blank(), panel.border = element_rect(colour = "black", fill = NA))
   # Histogram or Bar
   if (variable == "igbp_class"){
@@ -505,7 +522,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
 }
 
 #### PLOTTING SITES ####
-df <- build_data(input_dir[1])
+df <- build_data(input_dir[6])
 
 # Args: input df, mode, cloud flag, qc flag
 # mode: 0 = Nadir; 1 = Glint; 2 = Target; 3 = SAM; 4 = Transition; 5 = SAM & Target
@@ -514,12 +531,14 @@ df <- build_data(input_dir[1])
 df <- subset_flags(df, 3, 0, 0)
 
 # min lat, max lat, min lon, max lon
-df <- subset_location(df, 39, 42, -108, -104) # niwot
+df <- subset_location(df, 37, 40, -95, -90) # mzo
+# df <- subset_location(df, 39, 42, -108, -104) # niwot
 # df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
 # f <- subset_location(df, 35, 37, 139, 141) # Tokyo
 # df <- subset_location(df, 34, 38, -100, -94) # Lamont
 
 # IGBP number and percent
+df <- subset_cover(df, NA, NA) # niwot
 df <- subset_cover(df, 1, NA) # niwot
 # df <- subset_cover(df, NA, NA) # ecostress_us_syv
 # df <- subset_cover(df, 2, 100) # Amazon
@@ -527,15 +546,17 @@ df <- subset_cover(df, 1, NA) # niwot
 
 # Orbit number
 # df_6283 <- subset_orbit(df, 6283)
-df_6287 <- subset_orbit(df, 6287)
+# df_6287 <- subset_orbit(df, 6287)
 
-poly_df <- build_polyDF(df_6283) # Build shapefile
+# poly_df <- build_polyDF(df_6287) # Build shapefile
+poly_df <- build_polyDF(df) # Build shapefile
 
 # Add LAI to shapefile
 poly_df <- build_laiCop("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202006300000_GLOBE_PROBAV_V2.0.1.nc", poly_df)
 
 # Add Shortwave Radiation Downward at the surface
-poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_1700.nc", poly_df) # niwot
+# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_1700.nc", poly_df) # niwot
+poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_2300.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-17.nc", poly_df) # ecostress_us_syv
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-26.nc", poly_df) # ATTO - incorrect
 
@@ -543,7 +564,7 @@ poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_S
 # poly_df <- build_evi("C:/Russell/Projects/Geometry/Data/evi/GPP.2019177.h12v08.tif", poly_df)
 
 # Arg: SpatialPolygonDF, variable of interest, save to file?, site name, output directory name, offset autozoom
-plot_data(poly_df, "sif740", TRUE, "Niwot", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1)
+plot_data(poly_df, "pa", TRUE, "sif_Ozark_USA", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1)
 # plot_data(poly_df, "sif740", TRUE, "ecostress_us_syv", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
 # plot_data(poly_df, "sif740", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
 # plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
