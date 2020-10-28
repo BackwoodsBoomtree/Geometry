@@ -9,16 +9,12 @@ library(raster)
 library(rgdal)
 library(lutz)
 library(data.table)
-library(extrafont)
-font_import()
-loadfonts()
-fonts()
 
 options(scipen = 999)
 options(digits = 14)
 
-input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/mzo", full.names = TRUE, pattern = "*.nc4")
-# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
+# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/mzo", full.names = TRUE, pattern = "*.nc4")
+input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ecostress_us_syv", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/oco3/Lamont", full.names = TRUE, pattern = "*.nc4")
@@ -137,19 +133,21 @@ build_data <- function (input_file) {
   # Phase Angle
   pa_table <- data.frame(sza, vza, saa, vaa)  # build table
   pa <- compute_phase_angle(pa_table)
-
-  df <- data.frame("sid" = id, "mode" = mode, "orbit" = orbit, "cloud_flag" = cloud_flag, "quality_flag" = q_flag,
-                   "time" = as.POSIXct(time, origin = "1990-01-01", tz = "UTC"), "lon_center" = lon_center, "lat_center" = lat_center,
-                   "sif740_D" = sif740_D, "sif757_D" = sif757_D, "sif771_D" = sif771_D,
-                   "sif740" = sif740, "sif740_U" = sif740_U,
-                   "sif757" = sif757, "sif757_U" = sif757_U, "rad757" = rad757,
-                   "sif771" = sif771, "sif771_U" = sif771_U, "rad771" = rad771,
+  df <- data.frame("SoundingID" = id, "MeasurementMode" = mode, "OrbitID" = orbit, "cloud_flag_abp" = cloud_flag, "Quality_Flag" = q_flag,
+                   "Delta_Time" = as.POSIXct(time, origin = "1990-01-01", tz = "UTC"), "longitude" = lon_center, "latitude" = lat_center,
+                   "Daily_SIF_740nm" = sif740_D, "Daily_SIF_757nm" = sif757_D, "Daily_SIF_771nm" = sif771_D,
+                   "SIF_740nm" = sif740, "SIF_Uncertainty_740nm" = sif740_U,
+                   "SIF_757nm" = sif757, "SIF_Uncertainty_757nm" = sif757_U, "continuum_radiance_757nm" = rad757,
+                   "SIF_771nm" = sif771, "SIF_Uncertainty_771nm" = sif771_U, "continuum_radiance_771nm" = rad771,
                    "lon_1" = lon1, "lon_2" = lon2, "lon_3" = lon3, "lon_4" = lon4,
                    "lat_1" = lat1, "lat_2" = lat2, "lat_3" = lat3, "lat_4" = lat4,
-                   "sza" = sza, "saa" = saa, "vza" = vza, "vaa" = vaa, "pa" = pa, "raa" = raa,
-                   "humidity" = humidity, "surface_pressure" = surface_pressure, "temp_skin" = temp_skin,
-                   "temp_2m" = temp_2m, "vpd" = vpd, "wind" = wind, "igbp_class" = igbp, "percent_cover" = percent_cover)
+                   "SZA" = sza, "SAz" = saa, "VZA" = vza, "VAz" = vaa, "PA" = pa, "RAz" = raa,
+                   "specific_humidity" = humidity, "surface_pressure" = surface_pressure, "temperature_skin" = temp_skin,
+                   "temperature_two_meter" = temp_2m, "vapor_pressure_deficit" = vpd, "wind_speed" = wind, "IGBP_index" = igbp, "sounding_land_fraction" = percent_cover)
   df <- na.omit(df) # drop rows that contain an NA anywhere
+  # Time Zone
+  file_time <<- as.POSIXct((as.numeric(max(df$Delta_Time)) + as.numeric(min(df$Delta_Time))) / 2, origin = "1970-01-01", tz = "UTC")
+  file_time <<- as.Date(file_time)
   return(df)
 }
 build_data_multi <- function (input_dir) {
@@ -172,57 +170,57 @@ subset_flags <- function(df, mode, flag_cloud, flag_qc) {
   # mode
   if (mode == 0) {
     lab_mode <- "NADIR"
-    df <- subset(df, mode == 0)
+    df <- subset(df, MeasurementMode == 0)
   }else if (mode == 1) {
     lab_mode <- "GLINT"
-    df <- subset(df, mode == 1)
+    df <- subset(df, MeasurementMode == 1)
   } else if (mode == 2) {
     lab_mode <- "TARGET"
-    df <- subset(df, mode == 2)
+    df <- subset(df, MeasurementMode == 2)
   } else if (mode == 3) {
     lab_mode <- "SAM"
-    df <- subset(df, mode == 3)
+    df <- subset(df, MeasurementMode == 3)
   } else if (mode == 4) {
     lab_mode <- "TRANSITION"
-    df <- subset(df, mode == 4)
+    df <- subset(df, MeasurementMode == 4)
   } else if (mode == 5) {
     lab_mode <- "SAM & Target"
-    df <- subset(df, mode == 2 | mode == 3)
+    df <- subset(df, MeasurementMode == 2 | MeasurementMode == 3)
   }
   # Cloud
   if (is.na(flag_cloud)) {
     lab_cloud <- "None"
   } else if (flag_cloud == 0) {
     lab_cloud <- "Clear"
-    df <- subset(df, cloud_flag == 0)
+    df <- subset(df, cloud_flag_abp == 0)
   } else if (flag_cloud == 1) {
     lab_cloud <- "Cloudy"
-    df <- subset(df, cloud_flag == 1)
+    df <- subset(df, cloud_flag_abp == 1)
   } else if (flag_cloud == 2) {
     lab_cloud <- "Not_Classified"
-    df <- subset(df, cloud_flag == 2)
+    df <- subset(df, cloud_flag_abp == 2)
   } else if (flag_cloud == 10) {
     lab_cloud <- "Clear?Cloudy"
-    df <- subset(df, cloud_flag <= 1)
+    df <- subset(df, cloud_flag_abp <= 1)
   }
   # QC
   if (is.na(flag_qc)){
     lab_qc <- "None"
   } else if (flag_qc == 0) {
     lab_qc <- "Best"
-    df <- subset(df, quality_flag == 0)
+    df <- subset(df, Quality_Flag == 0)
   } else if (flag_qc == 1) {
     lab_qc <- "Good"
-    df <- subset(df, quality_flag == 1)
+    df <- subset(df, Quality_Flag == 1)
   } else if (flag_qc == 2) {
     lab_qc <- "Bad"
-    df <- subset(df, quality_flag == 2)
+    df <- subset(df, Quality_Flag == 2)
   } else if (flag_qc == 10) {
     lab_qc <- "Best/Good"
-    df <- subset(df, quality_flag <= 1)
+    df <- subset(df, Quality_Flag <= 1)
   } else if (flag_qc == -1) {
     lab_qc <- "Not_Investigated"
-    df <- subset(df, quality_flag == -1)
+    df <- subset(df, Quality_Flag == -1)
   }
   lab_class <- "All" # replaced by subset_cover function if it is used to subset land cover
   list_return <- list("lab_mode" = lab_mode, "lab_cloud" = lab_cloud, "lab_qc" = lab_qc, "lab_class" = lab_class)
@@ -234,12 +232,12 @@ subset_location <- function (df, lat_min, lat_max, lon_min, lon_max) {
   return(df)
 }
 subset_orbit <- function (df, orbit_num) {
-  df <- subset(df, orbit == orbit_num)
+  df <- subset(df, OrbitID == orbit_num)
   return(df)
 }
 subset_cover <- function (df, igbp, percent) {
   if (!is.na(percent)) {
-    df <- subset(df, percent_cover >= percent) # Filter by percent
+    df <- subset(df, sounding_land_fraction >= percent) # Filter by percent
     lab_percent <<- paste0(percent, "%")
   } else if (is.na(percent)) {
     lab_percent <<- paste0("")
@@ -248,58 +246,67 @@ subset_cover <- function (df, igbp, percent) {
     lab_class <- "All"
   } else if (igbp == 1) {
     lab_class <- "Evergreen NF"
-    df <- subset(df, igbp_class == 1)
+    df <- subset(df, sounding_land_fraction == 1)
   } else if (igbp == 2) {
     lab_class <- "Evergreen BF"
-    df <- subset(df, igbp_class == 2)
+    df <- subset(df, sounding_land_fraction == 2)
   } else if (igbp == 3) {
     lab_class <- "Deciduous NF"
-    df <- subset(df, igbp_class == 3)
+    df <- subset(df, sounding_land_fraction == 3)
   } else if (igbp == 4) {
     lab_class <- "Deciduous BF"
-    df <- subset(df, igbp_class == 4)
+    df <- subset(df, sounding_land_fraction == 4)
   } else if (igbp == 5) {
     lab_class <- "Mixed Forest"
-    df <- subset(df, igbp_class == 5)
+    df <- subset(df, sounding_land_fraction == 5)
   } else if (igbp == 6) {
     lab_class <- "Closed Shrub"
-    df <- subset(df, igbp_class == 6)
+    df <- subset(df, sounding_land_fraction == 6)
   } else if (igbp == 7) {
     lab_class <- "Open Shrub"
-    df <- subset(df, igbp_class == 7)
+    df <- subset(df, sounding_land_fraction == 7)
   } else if (igbp == 8) {
     lab_class <- "Woody Savanna"
-    df <- subset(df, igbp_class == 8)
+    df <- subset(df, sounding_land_fraction == 8)
   } else if (igbp == 9) {
     lab_class <- "Savanna"
-    df <- subset(df, igbp_class == 9)
+    df <- subset(df, sounding_land_fraction == 9)
   } else if (igbp == 10) {
     lab_class <- "Grassland"
-    df <- subset(df, igbp_class == 10)
+    df <- subset(df, sounding_land_fraction == 10)
   } else if (igbp == 11) {
     lab_class <- "Perm Wetland"
-    df <- subset(df, igbp_class == 11)
+    df <- subset(df, sounding_land_fraction == 11)
   } else if (igbp == 12) {
     lab_class <- "Cropland"
-    df <- subset(df, igbp_class == 12)
+    df <- subset(df, sounding_land_fraction == 12)
   } else if (igbp == 13) {
     lab_class <- "Urban/Built-up"
-    df <- subset(df, igbp_class == 13)
+    df <- subset(df, sounding_land_fraction == 13)
   } else if (igbp == 14) {
     lab_class <- "Crop/Veg Mosaic"
-    df <- subset(df, igbp_class == 14)
+    df <- subset(df, sounding_land_fraction == 14)
   } else if (igbp == 15) {
     lab_class <- "Snow/Ice"
-    df <- subset(df, igbp_class == 15)
+    df <- subset(df, sounding_land_fraction == 15)
   } else if (igbp == 16) {
     lab_class <- "Barren"
-    df <- subset(df, igbp_class == 16)
+    df <- subset(df, sounding_land_fraction == 16)
   } else if (igbp == 17) {
     lab_class <- "Water"
   }
   list_return <- list("lab_class" = lab_class)
   list2env(list_return, .GlobalEnv)
   return(df)
+}
+remove_urban_barren <- function (df){
+  df <- subset(df, IGBP_index != 13) # Urban
+  df <- subset(df, IGBP_index != 16) # Barren
+  return(df)
+}
+remove_clump_na <- function (poly_df){
+  poly_df <- poly_df[!is.na(poly_df$clump), ]
+  return(poly_df)
 }
 build_polyDF <- function(df) {
   #### Create Polygons for each row ####
@@ -367,6 +374,14 @@ build_evi <- function (evi_raster, poly_df){
   poly_df$evi <- as.vector(evi_awm) # add LAI to shapefile
   return(poly_df)
 }
+build_clump <- function (poly_df){
+  clump_raster <- raster("C:/Russell/Projects/Geometry/Data/clump/global_clumping_index_240X_WGS84.tif")
+  # Sample clump raster using OCO footprint polygons and calculate area weighted mean
+  clump_awm <- extract(clump_raster, poly_df, weights = TRUE, fun = mean, na.rm = FALSE) # Return NA if there are any NA values in calculation. Conservative filter for non-veg areas.
+  clump_awm <- clump_awm / 100
+  poly_df$clump <- as.vector(clump_awm) # add clump to shapefile
+  return(poly_df)
+}
 plot_data <- function (df, variable, save, site_name, output_dir, offset) {
   register_google(key = "AIzaSyDPeI_hkrch7DqhKmhFJKeADWBpAKJL3h4")
 
@@ -376,7 +391,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
   # Labels for plotting
   lab_loc <- gsub("_", " ", site_name)
   lab_var <- sapply(gsub("_", " ", variable), toupper)
-  if (variable == "igbp_class") {
+  if (variable == "IGBP_index") {
     df$categorical <- df[[variable]]
     df$categorical <- gsub("\\<0\\>", "0 - Unclassified", df$categorical)
     df$categorical <- gsub("\\<1\\>", "1 - Evergreen NF", df$categorical)
@@ -397,13 +412,13 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
     df$categorical <- gsub("\\<16\\>", "16 - Barren", df$categorical)
     df$categorical <- gsub("\\<17\\>", "17 - Water", df$categorical)
     cat_labels <- mixedsort(unique(df$categorical))
-  } else if (variable == "cloud_flag") {
+  } else if (variable == "cloud_flag_abp") {
     df$categorical <- df[[variable]]
     df$categorical <- gsub("\\<0\\>", "0 - Clear", df$categorical)
     df$categorical <- gsub("\\<1\\>", "1 - Cloudy", df$categorical)
     df$categorical <- gsub("\\<2\\>", "2 - Not Classified", df$categorical)
     cat_labels <- mixedsort(unique(df$categorical))
-  } else if (variable == "quality_flag") {
+  } else if (variable == "Quality_Flag") {
     df$categorical <- df[[variable]]
     df$categorical <- gsub("\\<0\\>", "0 - Best", df$categorical)
     df$categorical <- gsub("\\<1\\>", "1 - Good", df$categorical)
@@ -434,7 +449,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
   center_point <- c(lon = (x_min + (0.5 * x_length)), lat = (y_min + (0.5 * y_length)))
   # Time Zone
   time_zone <- tz_lookup_coords(as.numeric(center_point[2]), as.numeric(center_point[1]), "accurate")
-  lab_time <- as.POSIXct((as.numeric(max(df$time)) + as.numeric(min(df$time))) / 2, origin = "1970-01-01", tz = "UTC")
+  lab_time <- as.POSIXct((as.numeric(max(df$Delta_Time)) + as.numeric(min(df$Delta_Time))) / 2, origin = "1970-01-01", tz = "UTC")
   lab_time <- format(lab_time, tz = time_zone, usetz = TRUE)
   # Main map
   map_main <- ggmap(get_map(location = c(lon = as.numeric(center_point[1]), lat = as.numeric(center_point[2])), source = "google", maptype="satellite", zoom = autozoom)) +
@@ -458,8 +473,8 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
     geom_point(aes(x = as.numeric(center_point[1]), y = as.numeric(center_point[2])), color = "black", size = 0.75, shape = 16, show.legend = FALSE) +
     theme(axis.ticks = element_blank(), axis.title = element_blank(), axis.text = element_blank(), plot.title = element_blank(), panel.border = element_rect(colour = "black", fill = NA))
   # Histogram or Bar
-  if (variable == "igbp_class"){
-    h <- ggplot(df@data, aes(x = factor(igbp_class), fill=factor(igbp_class))) + xlab(lab_var) +
+  if (variable == "sounding_land_fraction"){
+    h <- ggplot(df@data, aes(x = factor(sounding_land_fraction), fill=factor(sounding_land_fraction))) + xlab(lab_var) +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(
         values = plasma(length(unique(df$categorical)))) +
@@ -480,8 +495,8 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
             axis.text.x = element_text(margin = unit(c(0, 0, 0.1, 0), "cm")),
             axis.text.y = element_blank(),
             axis.title.x = element_text(margin = unit(c(0, 0, 0, 0), "cm")))
-  } else if (variable == "quality_flag"){
-    h <- ggplot(df@data, aes(x=factor(quality_flag), fill=factor(quality_flag))) + xlab(lab_var) +
+  } else if (variable == "Quality_Flag"){
+    h <- ggplot(df@data, aes(x=factor(Quality_Flag), fill=factor(Quality_Flag))) + xlab(lab_var) +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(
         values = plasma(length(unique(df$categorical)))) +
@@ -509,7 +524,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
   vp1 <- viewport(width = 0.19, height = 0.15, x = 0.87, y = 0.375)
   vp2 <- viewport(width = 0.23, height = 0.23, x = 0.87, y = 0.15)
   if (save) {
-    pdf(paste0(output_dir, site_name, "_", variable, "_", lab_mode, "_", df$orbit[1], "_Cloud", gsub("/", "", lab_cloud), "_QC",
+    pdf(paste0(output_dir, site_name, "_", variable, "_", lab_mode, "_", df$OrbitID[1], "_Cloud", gsub("/", "", lab_cloud), "_QC",
                gsub("/", "", lab_qc), "_Cover", gsub(" ", "", lab_class), ".pdf"), width = 7.5, height = 6.25, compress = FALSE)
     print(map_main, vp = vp_map)
     print(h, vp = vp1)
@@ -522,7 +537,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
 }
 
 #### PLOTTING SITES ####
-df <- build_data(input_dir[6])
+df <- build_data(input_dir[3])
 
 # Args: input df, mode, cloud flag, qc flag
 # mode: 0 = Nadir; 1 = Glint; 2 = Target; 3 = SAM; 4 = Transition; 5 = SAM & Target
@@ -531,32 +546,44 @@ df <- build_data(input_dir[6])
 df <- subset_flags(df, 3, 0, 0)
 
 # min lat, max lat, min lon, max lon
-df <- subset_location(df, 37, 40, -95, -90) # mzo
-# df <- subset_location(df, 39, 42, -108, -104) # niwot
+# df <- subset_location(df, 37, 40, -95, -90) # mzo
+df <- subset_location(df, 39, 42, -108, -104) # niwot
 # df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
 # f <- subset_location(df, 35, 37, 139, 141) # Tokyo
 # df <- subset_location(df, 34, 38, -100, -94) # Lamont
 
 # IGBP number and percent
+# df <- subset_cover(df, NA, NA) # mzo
 df <- subset_cover(df, NA, NA) # niwot
-df <- subset_cover(df, 1, NA) # niwot
 # df <- subset_cover(df, NA, NA) # ecostress_us_syv
 # df <- subset_cover(df, 2, 100) # Amazon
 # df <- subset_cover(df, "None") # Lamont
+
+# Remove urban and barren
+df <- remove_urban_barren(df)
 
 # Orbit number
 # df_6283 <- subset_orbit(df, 6283)
 # df_6287 <- subset_orbit(df, 6287)
 
-# poly_df <- build_polyDF(df_6287) # Build shapefile
+# poly_df <- build_polyDF(df_6283) # Build shapefile
 poly_df <- build_polyDF(df) # Build shapefile
+
+# Add clumping index to shapefile
+poly_df <- build_clump(poly_df)
+poly_df <- remove_clump_na(poly_df)
 
 # Add LAI to shapefile
 poly_df <- build_laiCop("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202006300000_GLOBE_PROBAV_V2.0.1.nc", poly_df)
 
 # Add Shortwave Radiation Downward at the surface
+# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-20_1900.nc", poly_df) # mzo
+# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-18_2000.nc", poly_df) # niwot
+# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-14_2300.nc", poly_df) # niwot
+poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-16_2100.nc", poly_df) # niwot
+# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2019-10-15_1600.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_1700.nc", poly_df) # niwot
-poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_2300.nc", poly_df) # niwot
+# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_2300.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-17.nc", poly_df) # ecostress_us_syv
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-26.nc", poly_df) # ATTO - incorrect
 
@@ -564,19 +591,21 @@ poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_S
 # poly_df <- build_evi("C:/Russell/Projects/Geometry/Data/evi/GPP.2019177.h12v08.tif", poly_df)
 
 # Arg: SpatialPolygonDF, variable of interest, save to file?, site name, output directory name, offset autozoom
-plot_data(poly_df, "pa", TRUE, "sif_Ozark_USA", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1)
+# plot_data(poly_df, "SIF_740nm", TRUE, "sif_Ozark_USA", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1)
+plot_data(poly_df, "SIF_740nm", TRUE, "Niwot_Ridge", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
 # plot_data(poly_df, "sif740", TRUE, "ecostress_us_syv", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
 # plot_data(poly_df, "sif740", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
 # plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
 # plot_data(poly_df, "sif740", TRUE, "val_lamontOK", "C:/Russell/R_Scripts/Geometry/")
 
 # Export df to csv
-write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_niwot_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$orbit[1], ".csv"), row.names = FALSE)
-# write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ecostress_us_syv_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
-# write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
+write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_niwot_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".csv"), row.names = FALSE)
+# write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_Ozark_USA_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".csv"), row.names = FALSE)
+# write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ecostress_us_syv_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
+# write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
 
 # Export to shapefile
-shapefile(poly_df, paste0("C:/Russell/Projects/Geometry/R_Scripts/SHP/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(lab_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$orbit[1], ".shp"), overwrite = TRUE)
+shapefile(poly_df, paste0("C:/Russell/Projects/Geometry/R_Scripts/SHP/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".shp"), overwrite = TRUE)
 
 
 

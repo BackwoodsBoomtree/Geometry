@@ -11,8 +11,6 @@ using Images
 
 struct SIFComparison2020{FT} end
 FT=Float32;
-# CLI_LUT = load_LUT(ClumpingIndexMODIS{FT}(), "C:/Russell/Projects/Geometry/Data/lut/global_clumping_index.tif", GriddingMachine.FormatTIFF(), 1, "1Y", false);
-# clumping_index = read_LUT(CLI_LUT, FT(36), FT(-107))
 
 CLI_PFT = load_LUT(ClumpingIndexPFT{FT}(), "C:/Russell/Projects/Geometry/Data/lut/clumping_factor_pft.nc", GriddingMachine.FormatNC(), "clump", "1Y", false);
 clumping_index = read_LUT(CLI_PFT, FT(36), FT(-107), 2)
@@ -27,10 +25,6 @@ lai_val = read_LUT(LAI_LUT, FT(30), FT(-100), 8);
 # CLI_PFT_test = CLI_PFT.data[1:end, 1:end, 2]
 # Gray.(CLI_PFT_test)
 
-"""
-    derive_spectrum()
-Derive and plot the albedo and SIF spectrum
-"""
 function derive_spectrum(input_data)
     FT = Float32;
     # read data from file
