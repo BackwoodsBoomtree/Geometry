@@ -35,7 +35,8 @@ function derive_spectrum(input_data, source_cab, week)
         angles.tto = input_data.VZA[i];
 
         # change the canopy profiles
-        can.Ω = input_data.clump[i];
+        # can.Ω = input_data.clump[i];
+        can.Ω = 1
         can.LAI = input_data.lai_cop[i];
         can.iLAI = can.LAI * can.Ω / can.nLayer;
 
@@ -53,7 +54,6 @@ function derive_spectrum(input_data, source_cab, week)
             end
             fluspect!(leaves[j], wls);
         end
-        print("Cab ", leaves[1].Cab, " ")
 
         # re-run the simulations
         canopy_geometry!(can, angles, can_opt, rt_con);
