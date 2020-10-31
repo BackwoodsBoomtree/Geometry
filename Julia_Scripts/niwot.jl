@@ -37,3 +37,9 @@ CSV.write("C:/Russell/Projects/Geometry/Julia_Scripts/CSV/OCO3_CliMA_niwot_means
 # CSV.write("C:/Russell/Projects/Geometry/Julia_Scripts/CSV/OCO3_CliMA_niwot_2020-06-12_6283.csv", df_6283)
 # CSV.write("C:/Russell/Projects/Geometry/Julia_Scripts/CSV/OCO3_CliMA_niwot_2020-06-12_6287.csv", df_6287)
 # CSV.write("C:/Russell/Projects/Geometry/Julia_Scripts/CSV/OCO3_CliMA_niwot_2020-06-16_6348.csv", df_6348)
+
+scatter(dfs_mean.mean_sif757, dfs_mean.mean_sif771, xlabel = "OCO-3 SIF 757nm (W m⁻² µm⁻¹ sr⁻¹)", ylabel = "OCO-3 SIF 771nm (W m⁻² µm⁻¹ sr⁻¹)", reg = true, linewidth = 2,
+title = "Mean OCO-3 SIF Grouped by PA at Niwot 2020-06-12", titlefontsize = 13, legend = false)
+
+scatter(dfs_mean.mean_sif757_sim, dfs_mean.mean_sif771_sim, xlabel = "CliMA SIF 757nm (W m⁻² µm⁻¹ sr⁻¹)", ylabel = "CliMA SIF 771nm (W m⁻² µm⁻¹ sr⁻¹)", reg = true, linewidth = 2,
+title = "Mean CliMA SIF Grouped by PA at Niwot 2020-06-12", titlefontsize = 13, legend = false)

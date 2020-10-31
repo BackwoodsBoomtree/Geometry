@@ -302,6 +302,9 @@ subset_cover <- function (df, igbp, percent) {
 remove_urban_barren <- function (df){
   df <- subset(df, IGBP_index != 13) # Urban
   df <- subset(df, IGBP_index != 16) # Barren
+  lab_class <- "No Urban or Barren"
+  list_return <- list("lab_class" = lab_class)
+  list2env(list_return, .GlobalEnv)
   return(df)
 }
 remove_clump_na <- function (poly_df){
@@ -391,6 +394,9 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
   # Labels for plotting
   lab_loc <- gsub("_", " ", site_name)
   lab_var <- sapply(gsub("_", " ", variable), toupper)
+  if (lab_var == "CLUMP") {
+    lab_var <- "Clumping Index"
+    }
   if (variable == "IGBP_index") {
     df$categorical <- df[[variable]]
     df$categorical <- gsub("\\<0\\>", "0 - Unclassified", df$categorical)
@@ -458,7 +464,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
       values = rev(plasma(length(unique(df$categorical)))),
       breaks = rev(mixedsort(unique(df$categorical))),
       labels = rev(cat_labels)) +
-    labs(title = paste0(lab_loc, "\n", lab_time, " | Orbit ", df$orbit[1], " | Mode: ", lab_mode,
+    labs(title = paste0(lab_loc, "\n", lab_time, " | Orbit ", df$OrbitID[1], " | Mode: ", lab_mode,
                         "\nCover: ", lab_class, " ", lab_percent, " | QC Filter: ", gsub("_", " ", lab_qc), " | Cloud Filter: ", gsub("_", " ", lab_cloud)),
                         fill = lab_var) +
     theme(axis.ticks = element_blank(), axis.title = element_blank(), panel.border = element_rect(colour = "black", fill=NA),
@@ -506,6 +512,16 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
             axis.text.x = element_text(margin = unit(c(0, 0, 0.1, 0), "cm")),
             axis.text.y = element_blank(),
             axis.title.x = element_text(margin = unit(c(0, 0, 0, 0), "cm")))
+  } else if (variable == "clump"){
+    h <- ggplot(df@data, aes_string(x = variable)) + xlab(lab_var) +
+      geom_density(alpha = .2, fill = "#FF6666") +
+      scale_x_continuous(expand = c(0, 0)) +
+      scale_y_continuous(expand = expansion(mult = c(0, .1)), breaks = seq(0, 12.5, by = 12.5)) +
+      theme(panel.border = element_rect(colour = "black", fill = NA), panel.background = element_blank(),
+            axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
+            axis.text.x = element_text(margin = unit(c(0, 0, 0.1, 0), "cm")),
+            axis.text.y = element_text(margin = unit(c(0, 0, 0.1, 0), "cm")),
+            axis.title.x = element_text(margin = unit(c(0, 0, 0, 0), "cm")))
   } else {
     h <- ggplot(df@data, aes_string(x = variable)) + xlab(lab_var) +
       geom_histogram(aes(y = ..density..), binwidth = 0.25, color = "black", fill = "gray85") +
@@ -525,7 +541,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
   vp2 <- viewport(width = 0.23, height = 0.23, x = 0.87, y = 0.15)
   if (save) {
     pdf(paste0(output_dir, site_name, "_", variable, "_", lab_mode, "_", df$OrbitID[1], "_Cloud", gsub("/", "", lab_cloud), "_QC",
-               gsub("/", "", lab_qc), "_Cover", gsub(" ", "", lab_class), ".pdf"), width = 7.5, height = 6.25, compress = FALSE)
+               gsub("/", "", lab_qc), "_Cover_", gsub(" ", "", lab_class), ".pdf"), width = 7.5, height = 6.25, compress = FALSE)
     print(map_main, vp = vp_map)
     print(h, vp = vp1)
     print(map_loc, vp = vp2)
@@ -537,7 +553,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
 }
 
 #### PLOTTING SITES ####
-df <- build_data(input_dir[3])
+df <- build_data(input_dir[2])
 
 # Args: input df, mode, cloud flag, qc flag
 # mode: 0 = Nadir; 1 = Glint; 2 = Target; 3 = SAM; 4 = Transition; 5 = SAM & Target
@@ -563,11 +579,11 @@ df <- subset_cover(df, NA, NA) # niwot
 df <- remove_urban_barren(df)
 
 # Orbit number
-# df_6283 <- subset_orbit(df, 6283)
+df_6283 <- subset_orbit(df, 6283)
 # df_6287 <- subset_orbit(df, 6287)
 
-# poly_df <- build_polyDF(df_6283) # Build shapefile
-poly_df <- build_polyDF(df) # Build shapefile
+poly_df <- build_polyDF(df_6283) # Build shapefile
+# poly_df <- build_polyDF(df) # Build shapefile
 
 # Add clumping index to shapefile
 poly_df <- build_clump(poly_df)
@@ -592,7 +608,7 @@ poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_S
 
 # Arg: SpatialPolygonDF, variable of interest, save to file?, site name, output directory name, offset autozoom
 # plot_data(poly_df, "SIF_740nm", TRUE, "sif_Ozark_USA", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1)
-plot_data(poly_df, "SIF_740nm", TRUE, "Niwot_Ridge", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
+plot_data(poly_df, "SIF_771nm", TRUE, "Niwot_Ridge", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
 # plot_data(poly_df, "sif740", TRUE, "ecostress_us_syv", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
 # plot_data(poly_df, "sif740", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
 # plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
