@@ -14,9 +14,9 @@ options(scipen = 999)
 options(digits = 14)
 
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/mzo", full.names = TRUE, pattern = "*.nc4")
-input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
+# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ecostress_us_syv", full.names = TRUE, pattern = "*.nc4")
-# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
+input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/oco3/Lamont", full.names = TRUE, pattern = "*.nc4")
 target_list <- read.csv("C:/Russell/Projects/Geometry/Data/oco3/site_list/oco3_targets.csv")
 
@@ -246,52 +246,52 @@ subset_cover <- function (df, igbp, percent) {
     lab_class <- "All"
   } else if (igbp == 1) {
     lab_class <- "Evergreen NF"
-    df <- subset(df, sounding_land_fraction == 1)
+    df <- subset(df, IGBP_index == 1)
   } else if (igbp == 2) {
     lab_class <- "Evergreen BF"
-    df <- subset(df, sounding_land_fraction == 2)
+    df <- subset(df, IGBP_index == 2)
   } else if (igbp == 3) {
     lab_class <- "Deciduous NF"
-    df <- subset(df, sounding_land_fraction == 3)
+    df <- subset(df, IGBP_index == 3)
   } else if (igbp == 4) {
     lab_class <- "Deciduous BF"
-    df <- subset(df, sounding_land_fraction == 4)
+    df <- subset(df, IGBP_index == 4)
   } else if (igbp == 5) {
     lab_class <- "Mixed Forest"
-    df <- subset(df, sounding_land_fraction == 5)
+    df <- subset(df, IGBP_index == 5)
   } else if (igbp == 6) {
     lab_class <- "Closed Shrub"
-    df <- subset(df, sounding_land_fraction == 6)
+    df <- subset(df, IGBP_index == 6)
   } else if (igbp == 7) {
     lab_class <- "Open Shrub"
-    df <- subset(df, sounding_land_fraction == 7)
+    df <- subset(df, IGBP_index == 7)
   } else if (igbp == 8) {
     lab_class <- "Woody Savanna"
-    df <- subset(df, sounding_land_fraction == 8)
+    df <- subset(df, IGBP_index == 8)
   } else if (igbp == 9) {
     lab_class <- "Savanna"
-    df <- subset(df, sounding_land_fraction == 9)
+    df <- subset(df, IGBP_index == 9)
   } else if (igbp == 10) {
     lab_class <- "Grassland"
-    df <- subset(df, sounding_land_fraction == 10)
+    df <- subset(df, IGBP_index == 10)
   } else if (igbp == 11) {
     lab_class <- "Perm Wetland"
-    df <- subset(df, sounding_land_fraction == 11)
+    df <- subset(df, IGBP_index == 11)
   } else if (igbp == 12) {
     lab_class <- "Cropland"
-    df <- subset(df, sounding_land_fraction == 12)
+    df <- subset(df, IGBP_index == 12)
   } else if (igbp == 13) {
     lab_class <- "Urban/Built-up"
-    df <- subset(df, sounding_land_fraction == 13)
+    df <- subset(df, IGBP_index == 13)
   } else if (igbp == 14) {
     lab_class <- "Crop/Veg Mosaic"
-    df <- subset(df, sounding_land_fraction == 14)
+    df <- subset(df, IGBP_index == 14)
   } else if (igbp == 15) {
     lab_class <- "Snow/Ice"
-    df <- subset(df, sounding_land_fraction == 15)
+    df <- subset(df, IGBP_index == 15)
   } else if (igbp == 16) {
     lab_class <- "Barren"
-    df <- subset(df, sounding_land_fraction == 16)
+    df <- subset(df, IGBP_index == 16)
   } else if (igbp == 17) {
     lab_class <- "Water"
   }
@@ -553,7 +553,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
 }
 
 #### PLOTTING SITES ####
-df <- build_data(input_dir[2])
+df <- build_data(input_dir[1])
 
 # Args: input df, mode, cloud flag, qc flag
 # mode: 0 = Nadir; 1 = Glint; 2 = Target; 3 = SAM; 4 = Transition; 5 = SAM & Target
@@ -563,31 +563,31 @@ df <- subset_flags(df, 3, 0, 0)
 
 # min lat, max lat, min lon, max lon
 # df <- subset_location(df, 37, 40, -95, -90) # mzo
-df <- subset_location(df, 39, 42, -108, -104) # niwot
-# df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
+# df <- subset_location(df, 39, 42, -108, -104) # niwot
+df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
 # f <- subset_location(df, 35, 37, 139, 141) # Tokyo
 # df <- subset_location(df, 34, 38, -100, -94) # Lamont
 
 # IGBP number and percent
 # df <- subset_cover(df, NA, NA) # mzo
-df <- subset_cover(df, NA, NA) # niwot
+# df <- subset_cover(df, NA, NA) # niwot
 # df <- subset_cover(df, NA, NA) # ecostress_us_syv
-# df <- subset_cover(df, 2, 100) # Amazon
+df <- subset_cover(df, 2, 100) # Amazon
 # df <- subset_cover(df, "None") # Lamont
 
 # Remove urban and barren
 df <- remove_urban_barren(df)
 
 # Orbit number
-df_6283 <- subset_orbit(df, 6283)
+# df_6283 <- subset_orbit(df, 6283)
 # df_6287 <- subset_orbit(df, 6287)
 
-poly_df <- build_polyDF(df_6283) # Build shapefile
-# poly_df <- build_polyDF(df) # Build shapefile
+# poly_df <- build_polyDF(df_6283) # Build shapefile
+poly_df <- build_polyDF(df) # Build shapefile
 
 # Add clumping index to shapefile
-poly_df <- build_clump(poly_df)
-poly_df <- remove_clump_na(poly_df)
+# poly_df <- build_clump(poly_df)
+# poly_df <- remove_clump_na(poly_df)
 
 # Add LAI to shapefile
 poly_df <- build_laiCop("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202006300000_GLOBE_PROBAV_V2.0.1.nc", poly_df)
@@ -596,29 +596,29 @@ poly_df <- build_laiCop("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-20_1900.nc", poly_df) # mzo
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-18_2000.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-14_2300.nc", poly_df) # niwot
-poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-16_2100.nc", poly_df) # niwot
+# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-16_2100.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2019-10-15_1600.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_1700.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_2300.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-17.nc", poly_df) # ecostress_us_syv
-# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-26.nc", poly_df) # ATTO - incorrect
+poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-26.nc", poly_df) # ATTO - incorrect
 
 # Add EVI to shapefile
 # poly_df <- build_evi("C:/Russell/Projects/Geometry/Data/evi/GPP.2019177.h12v08.tif", poly_df)
 
 # Arg: SpatialPolygonDF, variable of interest, save to file?, site name, output directory name, offset autozoom
 # plot_data(poly_df, "SIF_740nm", TRUE, "sif_Ozark_USA", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1)
-plot_data(poly_df, "SIF_771nm", TRUE, "Niwot_Ridge", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
+# plot_data(poly_df, "SIF_771nm", TRUE, "Niwot_Ridge", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
 # plot_data(poly_df, "sif740", TRUE, "ecostress_us_syv", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
-# plot_data(poly_df, "sif740", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
+plot_data(poly_df, "SIF_740nm", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
 # plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
 # plot_data(poly_df, "sif740", TRUE, "val_lamontOK", "C:/Russell/R_Scripts/Geometry/")
 
 # Export df to csv
-write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_niwot_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".csv"), row.names = FALSE)
+# write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_niwot_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".csv"), row.names = FALSE)
 # write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_Ozark_USA_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".csv"), row.names = FALSE)
 # write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ecostress_us_syv_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
-# write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
+write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".csv"), row.names = FALSE)
 
 # Export to shapefile
 shapefile(poly_df, paste0("C:/Russell/Projects/Geometry/R_Scripts/SHP/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".shp"), overwrite = TRUE)
