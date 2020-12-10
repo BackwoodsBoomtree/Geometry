@@ -4,7 +4,7 @@ using DataFrames
 
 struct SIFComparison2020{FT} end
 
-function derive_spectrum(input_data, source_cab, week)
+function derive_spectrum(input_data, source_cab, week, clumping)
     FT = Float32;
     ENV["GKSwstype"]="100";
 
@@ -35,8 +35,11 @@ function derive_spectrum(input_data, source_cab, week)
         angles.tto = input_data.VZA[i];
 
         # change the canopy profiles
-        # can.Ω = input_data.clump[i];
-        can.Ω = 1
+        if clumping == "clump"
+            can.Ω = input_data.clump[i];
+        else
+            can.Ω = 1
+        end
         can.LAI = input_data.lai_cop[i];
         can.iLAI = can.LAI * can.Ω / can.nLayer;
 
@@ -47,6 +50,10 @@ function derive_spectrum(input_data, source_cab, week)
 
         # Run fluspect on each layer to change Cab
         for j in 1:20
+            # SIFyield
+            leaves[j].fqe = 0.47
+            leaves[j].Cx = 0.22
+
             if source_cab == "LUT"
                 leaves[j].Cab = read_LUT(CAB_LUT, FT(input_data.latitude[i]), FT(input_data.longitude[i]), week);
             else
@@ -69,11 +76,12 @@ function derive_spectrum(input_data, source_cab, week)
     # 742 nm and 737 nm to 740 nm
     # 757 nm to 757 nm
     # 767 nm and 774.5 nm to 771 nm
-    input_data.SIF740_Sim = mat_SIF[:,19] .* 0.4 .+ mat_SIF[:,20] .* 0.6;
-    input_data.SIF757_Sim = mat_SIF[:,23];
-    input_data.SIF771_Sim = mat_SIF[:,25] .* 0.4667 .+ mat_SIF[:,26] .* 0.5333;
-    input_data.REF757_Sim = mat_REF[:,47];
-    input_data.REF771_Sim = mat_REF[:,49] .* 0.4667 .+ mat_REF[:,50] .* 0.5333;
+    output_data = deepcopy(input_data)
+    output_data.SIF740_Sim = mat_SIF[:,19] .* 0.4 .+ mat_SIF[:,20] .* 0.6;
+    output_data.SIF757_Sim = mat_SIF[:,23];
+    output_data.SIF771_Sim = mat_SIF[:,25] .* 0.4667 .+ mat_SIF[:,26] .* 0.5333;
+    output_data.REF757_Sim = mat_REF[:,47];
+    output_data.REF771_Sim = mat_REF[:,49] .* 0.4667 .+ mat_REF[:,50] .* 0.5333;
 
-    return mat_REF, mat_SIF, wls.WLF, wls.WL, input_data
+    return mat_REF, mat_SIF, wls.WLF, wls.WL, output_data
 end

@@ -14,9 +14,9 @@ options(scipen = 999)
 options(digits = 14)
 
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/mzo", full.names = TRUE, pattern = "*.nc4")
-# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
+input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ecostress_us_syv", full.names = TRUE, pattern = "*.nc4")
-input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
+# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/oco3/Lamont", full.names = TRUE, pattern = "*.nc4")
 target_list <- read.csv("C:/Russell/Projects/Geometry/Data/oco3/site_list/oco3_targets.csv")
 
@@ -553,7 +553,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
 }
 
 #### PLOTTING SITES ####
-df <- build_data(input_dir[1])
+df <- build_data(input_dir[2])
 
 # Args: input df, mode, cloud flag, qc flag
 # mode: 0 = Nadir; 1 = Glint; 2 = Target; 3 = SAM; 4 = Transition; 5 = SAM & Target
@@ -563,27 +563,27 @@ df <- subset_flags(df, 3, 0, 0)
 
 # min lat, max lat, min lon, max lon
 # df <- subset_location(df, 37, 40, -95, -90) # mzo
-# df <- subset_location(df, 39, 42, -108, -104) # niwot
-df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
+df <- subset_location(df, 39, 42, -108, -104) # niwot
+# df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
 # f <- subset_location(df, 35, 37, 139, 141) # Tokyo
 # df <- subset_location(df, 34, 38, -100, -94) # Lamont
 
 # IGBP number and percent
 # df <- subset_cover(df, NA, NA) # mzo
-# df <- subset_cover(df, NA, NA) # niwot
+df <- subset_cover(df, NA, NA) # niwot
 # df <- subset_cover(df, NA, NA) # ecostress_us_syv
-df <- subset_cover(df, 2, 100) # Amazon
+# df <- subset_cover(df, 2, 100) # Amazon
 # df <- subset_cover(df, "None") # Lamont
 
 # Remove urban and barren
 df <- remove_urban_barren(df)
 
 # Orbit number
-# df_6283 <- subset_orbit(df, 6283)
+df_6283 <- subset_orbit(df, 6283)
 # df_6287 <- subset_orbit(df, 6287)
 
-# poly_df <- build_polyDF(df_6283) # Build shapefile
-poly_df <- build_polyDF(df) # Build shapefile
+poly_df <- build_polyDF(df_6283) # Build shapefile
+# poly_df <- build_polyDF(df) # Build shapefile
 
 # Add clumping index to shapefile
 # poly_df <- build_clump(poly_df)
@@ -608,9 +608,9 @@ poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_S
 
 # Arg: SpatialPolygonDF, variable of interest, save to file?, site name, output directory name, offset autozoom
 # plot_data(poly_df, "SIF_740nm", TRUE, "sif_Ozark_USA", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1)
-# plot_data(poly_df, "SIF_771nm", TRUE, "Niwot_Ridge", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
+plot_data(poly_df, "SIF_757nm", TRUE, "Niwot_Ridge", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
 # plot_data(poly_df, "sif740", TRUE, "ecostress_us_syv", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
-plot_data(poly_df, "SIF_740nm", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
+# plot_data(poly_df, "SIF_740nm", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
 # plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
 # plot_data(poly_df, "sif740", TRUE, "val_lamontOK", "C:/Russell/R_Scripts/Geometry/")
 
