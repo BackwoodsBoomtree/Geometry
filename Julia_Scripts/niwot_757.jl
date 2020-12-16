@@ -28,10 +28,10 @@ mat_REF_6283_noclump, mat_SIF_6283_noclump, wlf_6283_noclump, wl_6283_noclump, d
 mat_REF_6287_noclump, mat_SIF_6287_noclump, wlf_6287_noclump, wl_6287_noclump, df_6287_noclump = derive_spectrum(df_6287, "LUT", 24, "noclump");
 mat_REF_6348_noclump, mat_SIF_6348_noclump, wlf_6348_noclump, wl_6348_noclump, df_6348_noclump = derive_spectrum(df_6348, "LUT", 25, "noclump");
 
+site_name = "Niwot Ridge June 12 and 16"
+
 sif_results_clump, dfs_mean_clump = scatter_plot_SIF_757_niwot([df_6283_clump, df_6287_clump, df_6348_clump], site_name)
 sif_results_noclump, dfs_mean_noclump = scatter_plot_SIF_757_niwot([df_6283_noclump, df_6287_noclump, df_6348_noclump], site_name)
-
-site_name = "Niwot Ridge June 12 and 16"
 
 scatter(dfs_mean_clump.mean_sif757_sim, dfs_mean_clump.mean_sif757, xlabel = "Mean CliMA SIF₇₅₇ (W m⁻² µm⁻¹ sr⁻¹)", ylabel = "Mean OCO3 SIF₇₅₇ (W m⁻² µm⁻¹ sr⁻¹)", reg = true, linewidth = 2,
                 title = site_name, titlefontsize = 13, legend = :topleft, label = "Clumping", framestyle = :box, yerror = dfs_mean_clump.stderr_sif757)
@@ -48,7 +48,8 @@ annotate!(100, 45, text(string("R² = ", ref_results[1,1], "\nMAE = ", ref_resul
 annotate!(70, 60, text(string("R² = ", ref_results[1,2], "\nMAE = ", ref_results[5,2], "\n", ref_results[2,2]), :left, 10))
 savefig("C:/Russell/Projects/Geometry/Julia_Scripts/Figures/REF_OCO3_CliMA_Scatter_Niwot_W_Clumping_Test.pdf")
 
-CSV.write("C:/Russell/Projects/Geometry/Julia_Scripts/CSV/OCO3_CliMA_niwot_means_noclump.csv", dfs_mean)
+CSV.write("C:/Russell/Projects/Geometry/Julia_Scripts/CSV/OCO3_CliMA_niwot_means_noclump.csv", dfs_mean_noclump)
+CSV.write("C:/Russell/Projects/Geometry/Julia_Scripts/CSV/OCO3_CliMA_niwot_means_clump.csv", dfs_mean_clump)
 # CSV.write("C:/Russell/Projects/Geometry/Julia_Scripts/CSV/OCO3_CliMA_niwot_2020-06-12_6283.csv", df_6283)
 # CSV.write("C:/Russell/Projects/Geometry/Julia_Scripts/CSV/OCO3_CliMA_niwot_2020-06-12_6287.csv", df_6287)
 # CSV.write("C:/Russell/Projects/Geometry/Julia_Scripts/CSV/OCO3_CliMA_niwot_2020-06-16_6348.csv", df_6348)

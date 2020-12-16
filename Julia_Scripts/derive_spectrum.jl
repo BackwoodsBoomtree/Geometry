@@ -52,6 +52,7 @@ function derive_spectrum(input_data, source_cab, week, clumping)
         for j in 1:20
             # SIFyield
             leaves[j].fqe = 0.47
+            
             leaves[j].Cx = 0.22
 
             if source_cab == "LUT"
@@ -82,6 +83,8 @@ function derive_spectrum(input_data, source_cab, week, clumping)
     output_data.SIF771_Sim = mat_SIF[:,25] .* 0.4667 .+ mat_SIF[:,26] .* 0.5333;
     output_data.REF757_Sim = mat_REF[:,47];
     output_data.REF771_Sim = mat_REF[:,49] .* 0.4667 .+ mat_REF[:,50] .* 0.5333;
+    output_data.SIF757_Rel_Sim = output_data.SIF757_Sim ./ output_data.REF757_Sim
+    output_data.SIF771_Rel_Sim = output_data.SIF771_Sim ./ output_data.REF771_Sim
 
     return mat_REF, mat_SIF, wls.WLF, wls.WL, output_data
 end
