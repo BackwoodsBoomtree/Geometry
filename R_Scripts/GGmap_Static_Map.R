@@ -749,7 +749,7 @@ plot_data_niwot <- function (df, variable, save, site_name, output_dir, offset) 
 }
 
 #### PLOTTING SITES ####
-df <- build_data(input_dir[2])
+df <- build_data(input_dir[3])
 
 # Args: input df, mode, cloud flag, qc flag
 # mode: 0 = Nadir; 1 = Glint; 2 = Target; 3 = SAM; 4 = Transition; 5 = SAM & Target
@@ -775,11 +775,12 @@ df <- subset_cover(df, NA, NA) # niwot
 df <- remove_urban_barren(df)
 
 # Orbit number
-df_6283 <- subset_orbit(df, 6283)
+# df_6283 <- subset_orbit(df, 6283)
 # df_6287 <- subset_orbit(df, 6287)
 
-poly_df <- build_polyDF(df_6283) # Build shapefile
-# poly_df <- build_polyDF(df) # Build shapefile
+# poly_df <- build_polyDF(df_6283) # Build shapefile
+# poly_df <- build_polyDF(df_6287) # Build shapefile
+poly_df <- build_polyDF(df) # Build shapefile
 
 # Add clumping index to shapefile
 poly_df <- build_clump(poly_df)
@@ -792,9 +793,9 @@ poly_df <- build_laiCop("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-20_1900.nc", poly_df) # mzo
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-18_2000.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-14_2300.nc", poly_df) # niwot
-# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-16_2100.nc", poly_df) # niwot
+poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-16_2100.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2019-10-15_1600.nc", poly_df) # niwot
-poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_1700.nc", poly_df) # niwot
+# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_1700.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_2300.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-17.nc", poly_df) # ecostress_us_syv
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-26.nc", poly_df) # ATTO - incorrect
