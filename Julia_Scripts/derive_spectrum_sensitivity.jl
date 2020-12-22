@@ -4,7 +4,7 @@ using DataFrames
 
 struct SIFComparison2020{FT} end
 
-function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Float64,1}, by)
+function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Float64, 1}, by)
     FT = Float32;
     ENV["GKSwstype"]="100";
 
@@ -31,8 +31,12 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
     e_all_diff = sum(in_rad_bak.E_diffuse .* wls.dWL) / 1000;
 
     # create a matrix to store the spectrum
-    mat_REF = zeros(FT, (length(var_values), length(wls.WL)));
-    mat_SIF = zeros(FT, (length(var_values), length(wls.WLF)));
+    mat_REF           = zeros(FT, (length(var_values), length(wls.WL)));
+    mat_SIF           = zeros(FT, (length(var_values), length(wls.WLF)));
+    mat_SIF_sunlit    = zeros(FT, (length(var_values), length(wls.WLF)));
+    mat_SIF_shaded    = zeros(FT, (length(var_values), length(wls.WLF)));
+    mat_SIF_scattered = zeros(FT, (length(var_values), length(wls.WLF)));
+    mat_SIF_soil      = zeros(FT, (length(var_values), length(wls.WLF)));
 
     # Run the model for each step in the range
     for i in 1:length(var_values)
@@ -85,8 +89,8 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
         end
 
         ### Sun Sensor Geometry Variables ###
-        if model_variable == "tts"              # Solar Zenith Angle (30 degrees)
-            angles.tts    = var_values[i]
+        if model_variable     == "tts"              # Solar Zenith Angle (30 degrees)
+            angles.tts        = var_values[i]
         elseif model_variable == "tto"          # Viewing Zenith Angle (0 degrees)
             angles.tto        = var_values[i]
         elseif model_variable == "psi"          # Relative Azimuth Angle (0 degrees)
@@ -97,12 +101,12 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
 
         # Run fluspect on each layer
         for j in 1:can.nLayer
-            if model_variable == "fqe" # SIFyield
-                leaves[j].fqe = var_values[i]
+            if model_variable     == "fqe" # SIFyield
+                leaves[j].fqe     = var_values[i]
             elseif model_variable == "Cx"
-                leaves[j].Cx = var_values[i]
+                leaves[j].Cx      = var_values[i]
             elseif model_variable == "Cab" # Chlorophyll ab
-                leaves[j].Cab = var_values[i]
+                leaves[j].Cab     = var_values[i]
             end
             fluspect!(leaves[j], wls);
         end
@@ -114,13 +118,15 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
         canopy_fluxes!(can, can_opt, can_rad, in_rad, soil, leaves, wls, rt_con);
         SIF_fluxes!(leaves, can_opt, can_rad, can, soil, wls, rt_con, rt_dim);
 
-        mat_REF[i,:] .= can_rad.Lo;
-        mat_SIF[i,:] .= can_rad.SIF_obs;
+        mat_REF[i,:]             .= can_rad.Lo;
+        mat_SIF[i,:]             .= can_rad.SIF_obs;
+        mat_SIF_sunlit[i,:]      .= can_rad.SIF_obs_sunlit;
+        mat_SIF_shaded[i,:]      .= can_rad.SIF_obs_shaded;
+        mat_SIF_scattered[i,:]   .= can_rad.SIF_obs_scattered;
+        mat_SIF_soil[i,:]        .= can_rad.SIF_obs_soil;
     end
 
-    # 742 nm and 737 nm to 740 nm
-    # 757 nm to 757 nm
-    # 767 nm and 774.5 nm to 771 nm
+    # Dataframe for specific parts of the spectrum
     output_data = DataFrame()
     if model_variable == "rad_ratio"
         output_data.temp = var_values_rat
@@ -128,13 +134,33 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
         output_data.temp = var_values
     end
     names!(output_data, Symbol.([model_variable]));
-    output_data.SIF740 = mat_SIF[:,19] .* 0.4 .+ mat_SIF[:,20] .* 0.6;
-    output_data.SIF757 = mat_SIF[:,23];
-    output_data.SIF771 = mat_SIF[:,25] .* 0.4667 .+ mat_SIF[:,26] .* 0.5333;
-    output_data.REF757 = mat_REF[:,47];
-    output_data.REF771 = mat_REF[:,49] .* 0.4667 .+ mat_REF[:,50] .* 0.5333;
-    output_data.SIF757_Relative = output_data.SIF757 ./ output_data.REF757
-    output_data.SIF771_Relative = output_data.SIF771 ./ output_data.REF771
 
-    return mat_REF, mat_SIF, wls.WLF, wls.WL, output_data
+    # SIF and Reflectance at 740, 757, 771
+    output_data.SIF740           = mat_SIF[:,19] .* 0.4 .+ mat_SIF[:,20] .* 0.6;
+    output_data.SIF757           = mat_SIF[:,23];
+    output_data.SIF771           = mat_SIF[:,25] .* 0.4667 .+ mat_SIF[:,26] .* 0.5333;
+
+    output_data.SIF740_sunlit    = mat_SIF_sunlit[:,19] .* 0.4 .+ mat_SIF_sunlit[:,20] .* 0.6;
+    output_data.SIF757_sunlit    = mat_SIF_sunlit[:,23];
+    output_data.SIF771_sunlit    = mat_SIF_sunlit[:,25] .* 0.4667 .+ mat_SIF_sunlit[:,26] .* 0.5333;
+
+    output_data.SIF740_shaded    = mat_SIF_shaded[:,19] .* 0.4 .+ mat_SIF_shaded[:,20] .* 0.6;
+    output_data.SIF757_shaded    = mat_SIF_shaded[:,23];
+    output_data.SIF771_shaded    = mat_SIF_shaded[:,25] .* 0.4667 .+ mat_SIF_shaded[:,26] .* 0.5333;
+
+    output_data.SIF740_scattered = mat_SIF_scattered[:,19] .* 0.4 .+ mat_SIF_scattered[:,20] .* 0.6;
+    output_data.SIF757_scattered = mat_SIF_scattered[:,23];
+    output_data.SIF771_scattered = mat_SIF_scattered[:,25] .* 0.4667 .+ mat_SIF_scattered[:,26] .* 0.5333;
+
+    output_data.SIF740_soil      = mat_SIF_soil[:,19] .* 0.4 .+ mat_SIF_soil[:,20] .* 0.6;
+    output_data.SIF757_soil      = mat_SIF_soil[:,23];
+    output_data.SIF771_soil      = mat_SIF_soil[:,25] .* 0.4667 .+ mat_SIF_soil[:,26] .* 0.5333;
+   
+    output_data.REF757           = mat_REF[:,47];
+    output_data.REF771           = mat_REF[:,49] .* 0.4667 .+ mat_REF[:,50] .* 0.5333;
+
+    output_data.SIF757_Relative  = output_data.SIF757 ./ output_data.REF757
+    output_data.SIF771_Relative  = output_data.SIF771 ./ output_data.REF771
+    
+    return mat_REF, mat_SIF, mat_SIF_sunlit, mat_SIF_shaded, mat_SIF_scattered, mat_SIF_soil, wls.WLF, wls.WL, output_data
 end
