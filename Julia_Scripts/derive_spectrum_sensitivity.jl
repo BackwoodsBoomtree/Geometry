@@ -8,19 +8,6 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
     FT = Float32;
     ENV["GKSwstype"]="100";
 
-    # create vector of values within input range and by input step
-    var_values = collect(var_range[1]:by:var_range[2])
-    
-    if model_variable == "rad_ratio"
-        var_values_front = deepcopy(var_values)
-        var_values_front = reverse(deleteat!(var_values_front,1))
-        var_values_front_rat = inv.(rationalize.(var_values_front))
-        var_values_rat = rationalize.(var_values)
-        var_values_front = round.(inv.(var_values_front), digits = 2)
-        var_values = [var_values_front; var_values]
-        var_values_rat = [var_values_front_rat; var_values_rat]
-    end
-
     # initialize canopy radiation module
     angles, can, can_opt, can_rad, in_rad,
     leaves, rt_con, rt_dim, soil, wls = initialize_rt_module(FT);
@@ -30,8 +17,44 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
     e_all_dire = sum(in_rad_bak.E_direct  .* wls.dWL) / 1000;
     e_all_diff = sum(in_rad_bak.E_diffuse .* wls.dWL) / 1000;
 
+    # create vector of values within input range and by input step
+    var_values = collect(var_range[1]:by:var_range[2])
+
+    if model_variable == "rad_ratio"
+        var_values_front     = deepcopy(var_values)
+        var_values_front     = reverse(deleteat!(var_values_front,1))
+        var_values_front_rat = inv.(rationalize.(var_values_front))
+        var_values_rat       = rationalize.(var_values)
+        var_values_front     = round.(inv.(var_values_front), digits = 2)
+        var_values           = [var_values_front; var_values]
+        var_values_rat       = [var_values_front_rat; var_values_rat]
+    end
+
+    if model_variable == "cab_gradient"
+        by           = (var_range[2] - var_range[1]) / (can.nLayer - 1)
+        cab_gradient = round.(collect(var_range[1]:by:var_range[2]))
+        if var_range[1] == 0
+            midpoint = var_range[2] / 2
+        else
+            midpoint = var_range[2] - var_range[1]
+        end
+        # Running model over cab_gradient, not var_values, so only need var_values for labeling output df rows
+        var_values = [var_range[1], string("[", var_range[1], ", ", var_range[2], "]"),
+                      midpoint,
+                      string("[", var_range[2], ", ", var_range[1], "]"), var_range[2]]
+    end
+
+    if model_variable == "cab_gradient_year"
+        gradient_early  = [35, 42, 55, 58, 60, 55, 59, 57, 55, 52, 43, 32]
+        gradient_mid    = [0, 0, 0, 20, 55, 55, 55, 55, 55, 55, 55, 55, 52, 52, 52, 48, 45, 42, 40]
+        gradient_late   = [0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 15, 25, 30, 25, 18, 3, 0]
+        var_values      = ["Early", "Middle", "Late"]
+        nlayers_ying    = [12, 19, 17]
+    end
+
     # create a matrix to store the spectrum
     mat_REF           = zeros(FT, (length(var_values), length(wls.WL)));
+    mat_reflectance   = zeros(FT, (length(var_values), length(wls.WL)));
     mat_SIF           = zeros(FT, (length(var_values), length(wls.WLF)));
     mat_SIF_sunlit    = zeros(FT, (length(var_values), length(wls.WLF)));
     mat_SIF_shaded    = zeros(FT, (length(var_values), length(wls.WLF)));
@@ -42,9 +65,13 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
     for i in 1:length(var_values)
         
         ### Canopy Variables ###
-        if model_variable == "nLayer"           # Canopy Layers (20)
+        if model_variable     == "nLayer"       # Canopy Layers (20)
             angles, can, can_opt, can_rad, in_rad,
             leaves, rt_con, rt_dim, soil, wls = initialize_rt_module(FT, nLayer = var_values[i]);
+        elseif model_variable == "cab_gradient_year"   # Different number of layers through year
+            angles, can, can_opt, can_rad, in_rad,
+            leaves, rt_con, rt_dim, soil, wls = initialize_rt_module(FT, nLayer = nlayers_ying[i]);
+            println("Initialized with nLayer = ", can.nLayer)
         elseif model_variable == "Ω"            # Clumping Index (1.0)
             can.Ω             = var_values[i];
             can.iLAI          = can.LAI * can.Ω / can.nLayer;
@@ -89,7 +116,7 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
         end
 
         ### Sun Sensor Geometry Variables ###
-        if model_variable     == "tts"              # Solar Zenith Angle (30 degrees)
+        if model_variable     == "tts"          # Solar Zenith Angle (30 degrees)
             angles.tts        = var_values[i]
         elseif model_variable == "tto"          # Viewing Zenith Angle (0 degrees)
             angles.tto        = var_values[i]
@@ -101,12 +128,31 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
 
         # Run fluspect on each layer
         for j in 1:can.nLayer
-            if model_variable     == "fqe" # SIFyield
+            if model_variable     == "fqe"              # SIFyield
                 leaves[j].fqe     = var_values[i]
-            elseif model_variable == "Cx"
+            elseif model_variable == "Cx"               # Fractionation between Zeaxanthin and Violaxanthin in Car (1=all Zeaxanthin)
                 leaves[j].Cx      = var_values[i]
-            elseif model_variable == "Cab" # Chlorophyll ab
+            elseif model_variable == "Cab"              # Chlorophyll ab
                 leaves[j].Cab     = var_values[i]
+                println("Leaf Cab = ", leaves[j].Cab)
+            elseif model_variable == "cab_gradient"     # Chlorophyll gradient
+                if i == 1 || i == 3 || i == 5
+                    leaves[j].Cab     = var_values[i]
+                elseif i == 2
+                    leaves[j].Cab     = cab_gradient[j]
+                elseif i == 4
+                    leaves[j].Cab     = reverse(cab_gradient)[j]
+                end
+                println("Leaf Cab = ", leaves[j].Cab)
+            elseif model_variable == "cab_gradient_year" # Chlorophyll gradient year Peiqi Yang et al. 2017
+                if i == 1
+                    leaves[j].Cab     = gradient_early[j]
+                elseif i == 2
+                    leaves[j].Cab     = gradient_mid[j]
+                elseif i == 3
+                    leaves[j].Cab     = gradient_late[j]
+                end
+                println("Leaf Cab = ", leaves[j].Cab)
             end
             fluspect!(leaves[j], wls);
         end
@@ -119,6 +165,7 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
         SIF_fluxes!(leaves, can_opt, can_rad, can, soil, wls, rt_con, rt_dim);
 
         mat_REF[i,:]             .= can_rad.Lo;
+        # mat_reflectance[i,:]     .= can_rad.ρ_SW;
         mat_SIF[i,:]             .= can_rad.SIF_obs;
         mat_SIF_sunlit[i,:]      .= can_rad.SIF_obs_sunlit;
         mat_SIF_shaded[i,:]      .= can_rad.SIF_obs_shaded;
@@ -130,6 +177,8 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
     output_data = DataFrame()
     if model_variable == "rad_ratio"
         output_data.temp = var_values_rat
+    elseif model_variable == "cab_gradient"
+        output_data.temp = string.(var_values)
     else
         output_data.temp = var_values
     end
@@ -161,6 +210,14 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
 
     output_data.SIF757_Relative  = output_data.SIF757 ./ output_data.REF757
     output_data.SIF771_Relative  = output_data.SIF771 ./ output_data.REF771
+
+    # Vegetation Indices
+    output_data.nir                          = (mat_REF[:, 53] .+ mat_REF[:, 54]) ./ 2      # 842 and 867 (854.5) in model (MODIS: 841 - 876; 858.5)
+    output_data.red                          = mat_REF[:, 25]                               # 644.5 in model (MODIS: 620 - 670; 645)
+    output_data.blue                         = (mat_REF[:, 7] .+ mat_REF[:, 8]) ./ 2        # 464.5 and 474.5 (469.5) in model (MODIS: 459 - 479; 469)
+    output_data.NDVI             = (output_data.nir .- output_data.red) ./ (output_data.nir .+ output_data.red)
+    output_data.NIRv             = output_data.NDVI .* output_data.nir
+    output_data.EVI              = 2.5 .* ((output_data.nir .- output_data.red) ./ (output_data.nir .+ (6 .* output_data.red) .- (7.5 .* output_data.blue) .+ 1))
     
     return mat_REF, mat_SIF, mat_SIF_sunlit, mat_SIF_shaded, mat_SIF_scattered, mat_SIF_soil, wls.WLF, wls.WL, output_data
 end
