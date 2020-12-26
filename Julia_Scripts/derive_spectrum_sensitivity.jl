@@ -4,7 +4,7 @@ using DataFrames
 
 struct SIFComparison2020{FT} end
 
-function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Float64, 1}, by)
+function derive_spectrum_sensitivity(model_variable::String, var_range::Array, by)
     FT = Float32;
     ENV["GKSwstype"]="100";
 
@@ -44,7 +44,7 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
                       string("[", var_range[2], ", ", var_range[1], "]"), var_range[2]]
     end
 
-    if model_variable == "cab_gradient_year"
+    if model_variable == "cab_Yang_2017"
         gradient_early  = [35, 42, 55, 58, 60, 55, 59, 57, 55, 52, 43, 32]
         gradient_mid    = [0, 0, 0, 20, 55, 55, 55, 55, 55, 55, 55, 55, 52, 52, 52, 48, 45, 42, 40]
         gradient_late   = [0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 15, 25, 30, 25, 18, 3, 0]
@@ -53,13 +53,14 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
     end
 
     # create a matrix to store the spectrum
-    mat_REF           = zeros(FT, (length(var_values), length(wls.WL)));
-    mat_reflectance   = zeros(FT, (length(var_values), length(wls.WL)));
-    mat_SIF           = zeros(FT, (length(var_values), length(wls.WLF)));
-    mat_SIF_sunlit    = zeros(FT, (length(var_values), length(wls.WLF)));
-    mat_SIF_shaded    = zeros(FT, (length(var_values), length(wls.WLF)));
-    mat_SIF_scattered = zeros(FT, (length(var_values), length(wls.WLF)));
-    mat_SIF_soil      = zeros(FT, (length(var_values), length(wls.WLF)));
+    mat_rad_obs           = zeros(FT, (length(var_values), length(wls.WL)));
+    mat_ref               = zeros(FT, (length(var_values), length(wls.WL)));
+    mat_alb_obs           = zeros(FT, (length(var_values), length(wls.WL)));
+    mat_SIF_obs           = zeros(FT, (length(var_values), length(wls.WLF)));
+    mat_SIF_obs_sunlit    = zeros(FT, (length(var_values), length(wls.WLF)));
+    mat_SIF_obs_shaded    = zeros(FT, (length(var_values), length(wls.WLF)));
+    mat_SIF_obs_scattered = zeros(FT, (length(var_values), length(wls.WLF)));
+    mat_SIF_obs_soil      = zeros(FT, (length(var_values), length(wls.WLF)));
 
     # Run the model for each step in the range
     for i in 1:length(var_values)
@@ -68,7 +69,7 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
         if model_variable     == "nLayer"       # Canopy Layers (20)
             angles, can, can_opt, can_rad, in_rad,
             leaves, rt_con, rt_dim, soil, wls = initialize_rt_module(FT, nLayer = var_values[i]);
-        elseif model_variable == "cab_gradient_year"   # Different number of layers through year
+        elseif model_variable == "cab_Yang_2017"   # Different number of layers through year
             angles, can, can_opt, can_rad, in_rad,
             leaves, rt_con, rt_dim, soil, wls = initialize_rt_module(FT, nLayer = nlayers_ying[i]);
             println("Initialized with nLayer = ", can.nLayer)
@@ -130,10 +131,15 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
         for j in 1:can.nLayer
             if model_variable     == "fqe"              # SIFyield
                 leaves[j].fqe     = var_values[i]
+            elseif model_variable == "Car"               # Carotenoids
+                leaves[j].Car      = var_values[i]
             elseif model_variable == "Cx"               # Fractionation between Zeaxanthin and Violaxanthin in Car (1=all Zeaxanthin)
                 leaves[j].Cx      = var_values[i]
             elseif model_variable == "Cab"              # Chlorophyll ab
                 leaves[j].Cab     = var_values[i]
+                if leaves[j].Cab  == 0.0
+                    leaves[j].Car = 0.0
+                end
                 println("Leaf Cab = ", leaves[j].Cab)
             elseif model_variable == "cab_gradient"     # Chlorophyll gradient
                 if i == 1 || i == 3 || i == 5
@@ -144,13 +150,22 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
                     leaves[j].Cab     = reverse(cab_gradient)[j]
                 end
                 println("Leaf Cab = ", leaves[j].Cab)
-            elseif model_variable == "cab_gradient_year" # Chlorophyll gradient year Peiqi Yang et al. 2017
+            elseif model_variable == "cab_Yang_2017" # Chlorophyll gradient year Peiqi Yang et al. 2017
                 if i == 1
                     leaves[j].Cab     = gradient_early[j]
+                    if leaves[j].Cab  == 0.0
+                        leaves[j].Car = 0.0
+                    end
                 elseif i == 2
                     leaves[j].Cab     = gradient_mid[j]
+                    if leaves[j].Cab  == 0.0
+                        leaves[j].Car = 0.0
+                    end
                 elseif i == 3
                     leaves[j].Cab     = gradient_late[j]
+                    if leaves[j].Cab  == 0.0
+                        leaves[j].Car = 0.0
+                    end
                 end
                 println("Leaf Cab = ", leaves[j].Cab)
             end
@@ -164,13 +179,14 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
         canopy_fluxes!(can, can_opt, can_rad, in_rad, soil, leaves, wls, rt_con);
         SIF_fluxes!(leaves, can_opt, can_rad, can, soil, wls, rt_con, rt_dim);
 
-        mat_REF[i,:]             .= can_rad.Lo;
-        # mat_reflectance[i,:]     .= can_rad.ρ_SW;
-        mat_SIF[i,:]             .= can_rad.SIF_obs;
-        mat_SIF_sunlit[i,:]      .= can_rad.SIF_obs_sunlit;
-        mat_SIF_shaded[i,:]      .= can_rad.SIF_obs_shaded;
-        mat_SIF_scattered[i,:]   .= can_rad.SIF_obs_scattered;
-        mat_SIF_soil[i,:]        .= can_rad.SIF_obs_soil;
+        mat_rad_obs[i,:]             .= can_rad.Lo;
+        mat_ref[i,:]                 .= can_rad.Eout ./ (in_rad.E_direct .+ in_rad.E_diffuse)
+        mat_alb_obs[i,:]             .= can_rad.alb_obs
+        mat_SIF_obs[i,:]             .= can_rad.SIF_obs;
+        mat_SIF_obs_sunlit[i,:]      .= can_rad.SIF_obs_sunlit;
+        mat_SIF_obs_shaded[i,:]      .= can_rad.SIF_obs_shaded;
+        mat_SIF_obs_scattered[i,:]   .= can_rad.SIF_obs_scattered;
+        mat_SIF_obs_soil[i,:]        .= can_rad.SIF_obs_soil;
     end
 
     # Dataframe for specific parts of the spectrum
@@ -184,40 +200,47 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array{Fl
     end
     names!(output_data, Symbol.([model_variable]));
 
-    # SIF and Reflectance at 740, 757, 771
-    output_data.SIF740           = mat_SIF[:,19] .* 0.4 .+ mat_SIF[:,20] .* 0.6;
-    output_data.SIF757           = mat_SIF[:,23];
-    output_data.SIF771           = mat_SIF[:,25] .* 0.4667 .+ mat_SIF[:,26] .* 0.5333;
+    # SIF at 740, 757, 771
+    output_data.SIF740           = mat_SIF_obs[:,19] .* 0.4 .+ mat_SIF_obs[:,20] .* 0.6;
+    output_data.SIF757           = mat_SIF_obs[:,23];
+    output_data.SIF771           = mat_SIF_obs[:,25] .* 0.4667 .+ mat_SIF_obs[:,26] .* 0.5333;
 
-    output_data.SIF740_sunlit    = mat_SIF_sunlit[:,19] .* 0.4 .+ mat_SIF_sunlit[:,20] .* 0.6;
-    output_data.SIF757_sunlit    = mat_SIF_sunlit[:,23];
-    output_data.SIF771_sunlit    = mat_SIF_sunlit[:,25] .* 0.4667 .+ mat_SIF_sunlit[:,26] .* 0.5333;
+    output_data.SIF740_sunlit    = mat_SIF_obs_sunlit[:,19] .* 0.4 .+ mat_SIF_obs_sunlit[:,20] .* 0.6;
+    output_data.SIF757_sunlit    = mat_SIF_obs_sunlit[:,23];
+    output_data.SIF771_sunlit    = mat_SIF_obs_sunlit[:,25] .* 0.4667 .+ mat_SIF_obs_sunlit[:,26] .* 0.5333;
 
-    output_data.SIF740_shaded    = mat_SIF_shaded[:,19] .* 0.4 .+ mat_SIF_shaded[:,20] .* 0.6;
-    output_data.SIF757_shaded    = mat_SIF_shaded[:,23];
-    output_data.SIF771_shaded    = mat_SIF_shaded[:,25] .* 0.4667 .+ mat_SIF_shaded[:,26] .* 0.5333;
+    output_data.SIF740_shaded    = mat_SIF_obs_shaded[:,19] .* 0.4 .+ mat_SIF_obs_shaded[:,20] .* 0.6;
+    output_data.SIF757_shaded    = mat_SIF_obs_shaded[:,23];
+    output_data.SIF771_shaded    = mat_SIF_obs_shaded[:,25] .* 0.4667 .+ mat_SIF_obs_shaded[:,26] .* 0.5333;
 
-    output_data.SIF740_scattered = mat_SIF_scattered[:,19] .* 0.4 .+ mat_SIF_scattered[:,20] .* 0.6;
-    output_data.SIF757_scattered = mat_SIF_scattered[:,23];
-    output_data.SIF771_scattered = mat_SIF_scattered[:,25] .* 0.4667 .+ mat_SIF_scattered[:,26] .* 0.5333;
+    output_data.SIF740_scattered = mat_SIF_obs_scattered[:,19] .* 0.4 .+ mat_SIF_obs_scattered[:,20] .* 0.6;
+    output_data.SIF757_scattered = mat_SIF_obs_scattered[:,23];
+    output_data.SIF771_scattered = mat_SIF_obs_scattered[:,25] .* 0.4667 .+ mat_SIF_obs_scattered[:,26] .* 0.5333;
 
-    output_data.SIF740_soil      = mat_SIF_soil[:,19] .* 0.4 .+ mat_SIF_soil[:,20] .* 0.6;
-    output_data.SIF757_soil      = mat_SIF_soil[:,23];
-    output_data.SIF771_soil      = mat_SIF_soil[:,25] .* 0.4667 .+ mat_SIF_soil[:,26] .* 0.5333;
+    output_data.SIF740_soil      = mat_SIF_obs_soil[:,19] .* 0.4 .+ mat_SIF_obs_soil[:,20] .* 0.6;
+    output_data.SIF757_soil      = mat_SIF_obs_soil[:,23];
+    output_data.SIF771_soil      = mat_SIF_obs_soil[:,25] .* 0.4667 .+ mat_SIF_obs_soil[:,26] .* 0.5333;
    
-    output_data.REF757           = mat_REF[:,47];
-    output_data.REF771           = mat_REF[:,49] .* 0.4667 .+ mat_REF[:,50] .* 0.5333;
+    # Outgoing SW Radiation at 757, 771
+    output_data.Rad757           = mat_rad_obs[:,47];
+    output_data.Rad771           = mat_rad_obs[:,49] .* 0.4667 .+ mat_rad_obs[:,50] .* 0.5333;
 
-    output_data.SIF757_Relative  = output_data.SIF757 ./ output_data.REF757
-    output_data.SIF771_Relative  = output_data.SIF771 ./ output_data.REF771
+    # Reflectance at 757, 771
+    output_data.Ref757           = mat_ref[:,47];
+    output_data.Ref771           = mat_ref[:,49] .* 0.4667 .+ mat_ref[:,50] .* 0.5333;
+
+    output_data.SIF757_Relative  = output_data.SIF757 ./ output_data.Rad757
+    output_data.SIF771_Relative  = output_data.SIF771 ./ output_data.Rad771
 
     # Vegetation Indices
-    output_data.nir                          = (mat_REF[:, 53] .+ mat_REF[:, 54]) ./ 2      # 842 and 867 (854.5) in model (MODIS: 841 - 876; 858.5)
-    output_data.red                          = mat_REF[:, 25]                               # 644.5 in model (MODIS: 620 - 670; 645)
-    output_data.blue                         = (mat_REF[:, 7] .+ mat_REF[:, 8]) ./ 2        # 464.5 and 474.5 (469.5) in model (MODIS: 459 - 479; 469)
+    output_data.nir              = (mat_alb_obs[:, 53] .+ mat_alb_obs[:, 54]) ./ 2      # 842 and 867 (854.5) in model (MODIS: 841 - 876; 858.5)
+    output_data.red              = mat_alb_obs[:, 25]                               # 644.5 in model (MODIS: 620 - 670; 645)
+    output_data.blue             = (mat_alb_obs[:, 7] .+ mat_alb_obs[:, 8]) ./ 2        # 464.5 and 474.5 (469.5) in model (MODIS: 459 - 479; 469)
+    output_data.swir             = (mat_alb_obs[:, 104] .+ mat_alb_obs[:, 105]) ./ 2    # 2117 and 2142 (2129.5) in model (MODIS: 2105 - 2155; 2130)
     output_data.NDVI             = (output_data.nir .- output_data.red) ./ (output_data.nir .+ output_data.red)
     output_data.NIRv             = output_data.NDVI .* output_data.nir
     output_data.EVI              = 2.5 .* ((output_data.nir .- output_data.red) ./ (output_data.nir .+ (6 .* output_data.red) .- (7.5 .* output_data.blue) .+ 1))
+    output_data.LSWI             = (output_data.nir .- output_data.swir) ./ (output_data.nir .+ output_data.swir)
     
-    return mat_REF, mat_SIF, mat_SIF_sunlit, mat_SIF_shaded, mat_SIF_scattered, mat_SIF_soil, wls.WLF, wls.WL, output_data
+    return mat_rad_obs, mat_ref, mat_alb_obs, mat_SIF_obs, mat_SIF_obs_sunlit, mat_SIF_obs_shaded, mat_SIF_obs_scattered, mat_SIF_obs_soil, wls.WLF, wls.WL, output_data
 end
