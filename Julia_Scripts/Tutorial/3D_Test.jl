@@ -119,3 +119,13 @@ surface(ylabel = "Viewing Zenith Angle (°)", xlabel = "Relative Azimuth Angle (
         title = "Solar Zenith Angle = 30°", size = (800,600), camera=(-30,30))
 p1 = surface!(x,y,z, colorbar = false)
 p2 = surface!(x,y,z2, c = :viridis, colorbar_title = "SIF/6", colorbar = true)
+
+x = collect(0:360)
+y = collect(0:85)
+z = fill(30, (86, 361))
+
+pyplot()
+surface(ylabel = "Viewing Zenith Angle (°)", xlabel = "Relative Azimuth Angle (°)", zlabel = "Emission or Reflectance",
+        title = "Solar Zenith Angle = 30°", size = (800,600))
+surface!(x,y,z, fill_z = sif_757)
+surface!(fill_z = sif_757, c = :viridis, colorbar_title = "asdf", colorbar = true)

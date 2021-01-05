@@ -234,7 +234,7 @@ function derive_spectrum_sensitivity(model_variable::String, var_range::Array, b
 
     # Vegetation Indices
     output_data.nir              = (mat_alb_obs[:, 53] .+ mat_alb_obs[:, 54]) ./ 2      # 842 and 867 (854.5) in model (MODIS: 841 - 876; 858.5)
-    output_data.red              = mat_alb_obs[:, 25]                               # 644.5 in model (MODIS: 620 - 670; 645)
+    output_data.red              = mat_alb_obs[:, 25]                                   # 644.5 in model (MODIS: 620 - 670; 645)
     output_data.blue             = (mat_alb_obs[:, 7] .+ mat_alb_obs[:, 8]) ./ 2        # 464.5 and 474.5 (469.5) in model (MODIS: 459 - 479; 469)
     output_data.swir             = (mat_alb_obs[:, 104] .+ mat_alb_obs[:, 105]) ./ 2    # 2117 and 2142 (2129.5) in model (MODIS: 2105 - 2155; 2130)
     output_data.NDVI             = (output_data.nir .- output_data.red) ./ (output_data.nir .+ output_data.red)
