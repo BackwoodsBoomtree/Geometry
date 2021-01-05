@@ -4,7 +4,7 @@ using DataFrames
 
 struct SIFComparison2020{FT} end
 
-function derive_spectrum(input_data, source_cab, week, clumping)
+function derive_spectrum(input_data, source_cab, week, clumping, sif_yield)
     FT = Float32;
     ENV["GKSwstype"]="100";
 
@@ -38,10 +38,9 @@ function derive_spectrum(input_data, source_cab, week, clumping)
         if clumping == "clump"
             can.Ω = input_data.clump[i];
         else
-            can.Ω = 1
+            can.Ω = clumping;
         end
         can.LAI = input_data.lai_cop[i];
-        can.iLAI = can.LAI * can.Ω / can.nLayer;
 
         # change incoming radiation
         in_rad = deepcopy(in_rad_bak);
@@ -51,10 +50,8 @@ function derive_spectrum(input_data, source_cab, week, clumping)
         # Run fluspect on each layer to change Cab
         for j in 1:20
             # SIFyield
-            leaves[j].fqe = 0.47
+            leaves[j].fqe = sif_yield;
             
-            leaves[j].Cx = 0.22
-
             if source_cab == "LUT"
                 leaves[j].Cab = read_LUT(CAB_LUT, FT(input_data.latitude[i]), FT(input_data.longitude[i]), week);
             else
