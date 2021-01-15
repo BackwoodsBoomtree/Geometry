@@ -1,6 +1,7 @@
 using CanopyLayers
 using GriddingMachine
 using DataFrames
+using CSV
 
 struct SIFComparison2020{FT} end
 
@@ -16,6 +17,10 @@ function derive_spectrum(input_data, source_cab, week, clumping, sif_yield)
     in_rad_bak = deepcopy(in_rad);
     e_all_dire = sum(in_rad_bak.E_direct  .* wls.dWL) / 1000;
     e_all_diff = sum(in_rad_bak.E_diffuse .* wls.dWL) / 1000;
+
+    if typeof(input_data) != DataFrame
+        input_data = DataFrame!(CSV.File(input_data));
+    end
 
     # create a matrix to store the spectrum
     mat_REF = zeros(FT, (length(input_data.VZA), length(wls.WL)));

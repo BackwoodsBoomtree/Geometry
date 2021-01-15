@@ -2,6 +2,7 @@ using Statistics
 using GLM
 using PlotPlants
 
+# Inputs are vectors of dataframes
 # Determines groups of data by phase angle. Adds a group_by_pa column and populates with group number
 function group_by_pa(dfs::Vector{DataFrame})
     dfs_return = Vector{DataFrame}()
@@ -29,7 +30,7 @@ function group_by_pa(dfs::Vector{DataFrame})
 end
 
 # For each dataframe, calculates means and standard errors for each group, and returns dataframe of such for each input dataframe
-function means_and_errors(dfs::Vector{DataFrame})
+function stats_and_errors(dfs::Vector{DataFrame})
     group_by_pa(dfs)
     mean_return = Vector{DataFrame}()
     mean_names = ["mean_sif740", "mean_sif740_sim", "stderr_sif740",
@@ -93,14 +94,53 @@ function means_and_errors(dfs::Vector{DataFrame})
         mean_merge = mean_return[1];
     end
     mean_return = nothing # Don't need it any more
-    println("Calculated MAE for the ", nrow(mean_merge), " groups.")
-    mae_names = ["mae_sif740","mae_sif757","mae_sif771","mae_ref757","mae_ref771"]
-    mae_return = DataFrame(fill(Float64, length(mae_names)), Symbol.(mae_names), 1);
-    mae_return.mae_sif740 = round(PlotPlants.mae(mean_merge.mean_sif740, mean_merge.mean_sif740_sim), digits = 2)
-    mae_return.mae_sif757 = round(PlotPlants.mae(mean_merge.mean_sif757, mean_merge.mean_sif757_sim), digits = 2)
-    mae_return.mae_sif771 = round(PlotPlants.mae(mean_merge.mean_sif771, mean_merge.mean_sif771_sim), digits = 2)
-    mae_return.mae_ref757 = round(PlotPlants.mae(mean_merge.mean_ref757, mean_merge.mean_ref757_sim), digits = 2)
-    mae_return.mae_ref771 = round(PlotPlants.mae(mean_merge.mean_ref771, mean_merge.mean_ref771_sim), digits = 2)
 
-    return(mean_merge, mae_return);
+    # Build empty df for output of statistics
+    r2_names        = ["r2_sif740","r2_sif757","r2_sif771","r2_ref757","r2_ref771"];
+    pval_names      = ["pval_sif740","pval_sif757","pval_sif771","pval_ref757","pval_ref771"];
+    slope_names     = ["slope_sif740","slope_sif757","slope_sif771","slope_ref757","slope_ref771"];
+    intercept_names = ["intercept_sif740","intercept_sif757","intercept_sif771","intercept_ref757","intercept_ref771"];
+    mae_names       = ["mae_sif740","mae_sif757","mae_sif771","mae_ref757","mae_ref771"];
+    all_names       = vcat(r2_names, pval_names, slope_names, intercept_names, mae_names)
+    stats_return    = DataFrame(fill(Float64, length(all_names)), Symbol.(all_names), 1);
+
+    # SIF stats
+    df740_sif, df757_sif, df771_sif    = DataFrame(X = mean_merge.mean_sif740_sim, Y = mean_merge.mean_sif740),
+                                         DataFrame(X = mean_merge.mean_sif757_sim, Y = mean_merge.mean_sif757),
+                                         DataFrame(X = mean_merge.mean_sif771_sim, Y = mean_merge.mean_sif771);
+    reg740_sif, reg757_sif, reg771_sif = lm(@formula(Y ~ X), df740_sif), lm(@formula(Y ~ X), df757_sif), lm(@formula(Y ~ X), df771_sif);
+    # Reflectance stats
+    df757_ref, df771_ref               = DataFrame(X = mean_merge.mean_ref757_sim, Y = mean_merge.mean_ref757),
+                                         DataFrame(X = mean_merge.mean_ref771_sim, Y = mean_merge.mean_ref771);
+    reg757_ref, reg771_ref             = lm(@formula(Y ~ X), df757_ref), lm(@formula(Y ~ X), df771_ref);
+
+    # Fill output df with SIF Stats
+    stats_return.r2_sif740, stats_return.r2_sif757, stats_return.r2_sif771                      = # R2
+        (round(r2(reg740_sif), digits = 2), round(r2(reg757_sif), digits = 2), round(r2(reg771_sif), digits = 2)) 
+    stats_return.pval_sif740, stats_return.pval_sif757, stats_return.pval_sif771                = # Pval
+        (round(coeftable(reg740_sif).cols[4][2], digits = 3), round(coeftable(reg757_sif).cols[4][2], digits = 3), round(coeftable(reg771_sif).cols[4][2], digits = 3)) 
+    stats_return.slope_sif740, stats_return.slope_sif757, stats_return.slope_sif771             = # slope
+        (round(coef(reg740_sif)[2], digits = 2), round(coef(reg757_sif)[2], digits = 2), round(coef(reg771_sif)[2], digits = 2))
+    stats_return.intercept_sif740, stats_return.intercept_sif757, stats_return.intercept_sif771 = # intercept
+        (round(coef(reg740_sif)[1], digits = 2), round(coef(reg757_sif)[1], digits = 2), round(coef(reg771_sif)[1], digits = 2))
+    # Fill output df with REF Stats
+    stats_return.r2_ref757, stats_return.r2_ref771               = # R2
+        (round(r2(reg757_ref), digits = 2), round(r2(reg771_ref), digits = 2)) 
+    stats_return.pval_ref757, stats_return.pval_ref771           = # Pval
+        (round(coeftable(reg757_ref).cols[4][2], digits = 3), round(coeftable(reg771_ref).cols[4][2], digits = 3)) 
+    stats_return.slope_ref757, stats_return.slope_ref771         = # slope
+        (round(coef(reg757_ref)[2], digits = 2), round(coef(reg771_ref)[2], digits = 2))
+    stats_return.intercept_ref757, stats_return.intercept_ref771 = # intercept
+        (round(coef(reg757_ref)[1], digits = 2), round(coef(reg771_ref)[1], digits = 2))
+    println("Computed regression stats for the ", nrow(mean_merge), " groups.")
+
+    # MAE
+    stats_return.mae_sif740 = round(PlotPlants.mae(mean_merge.mean_sif740, mean_merge.mean_sif740_sim), digits = 2)
+    stats_return.mae_sif757 = round(PlotPlants.mae(mean_merge.mean_sif757, mean_merge.mean_sif757_sim), digits = 2)
+    stats_return.mae_sif771 = round(PlotPlants.mae(mean_merge.mean_sif771, mean_merge.mean_sif771_sim), digits = 2)
+    stats_return.mae_ref757 = round(PlotPlants.mae(mean_merge.mean_ref757, mean_merge.mean_ref757_sim), digits = 2)
+    stats_return.mae_ref771 = round(PlotPlants.mae(mean_merge.mean_ref771, mean_merge.mean_ref771_sim), digits = 2)
+    println("Calculated MAE for the ", nrow(mean_merge), " groups.")
+
+    return(mean_merge, stats_return);
 end

@@ -7,6 +7,7 @@ vza_max   = 85;
 plot_type = "757_clump"                  # plot_type is "SRRR" or "757_vis" or "757_clump"
 clump     = 0.4
 file_name = "C:/Russell/Projects/Geometry/Julia_Scripts/Figures/Polar/proposal_BRDF.pdf"
+
 p = plot_polar(sza, vza_max, plot_type, clump)
 p.savefig(file_name)
 
