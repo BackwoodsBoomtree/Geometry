@@ -81,6 +81,6 @@ function extract_data(file_list, vars_cloud, vars_geoloc, vars_meta, vars_meteo,
     compute_relative_angle(df, "SAz", "VAz", "RAz")
     compute_phase_angle(df, "SAz", "VAz", "RAz", "SZA", "VZA", "PA")
 
-    println("Extracted data from ", length(file_list), " files.")
+    println("Done! Extracted data from ", length(file_list), " files.\n")
     return(df)
 end
