@@ -358,7 +358,7 @@ build_laiERA5 <- function (era5_data, poly_df){
 }
 build_incoming_sw_ERA5 <- function (era5_data, poly_df){
   incoming_sw_era5 <- brick(era5_data, varname = "msdwswrfcs") # Mean surface downward short-wave radiation flux, clear sky
-  incoming_direct_era5 <- brick(era5_data, varname = "msdrswrfcs") # Mean surface downward short-wave radiation flux, clear sky
+  incoming_direct_era5 <- brick(era5_data, varname = "msdrswrfcs") # Mean surface direct downward short-wave radiation flux, clear sky
   # Sample LAI raster using OCO footprint polygons and calculate area weighted mean
   incoming_sw_era5 <- round(as.vector(extract(incoming_sw_era5, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)), digits = 3)
   incoming_direct_era5 <- round(as.vector(extract(incoming_direct_era5, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)), digits = 3)
