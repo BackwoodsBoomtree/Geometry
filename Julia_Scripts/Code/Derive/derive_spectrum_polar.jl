@@ -62,8 +62,8 @@ function derive_spectrum_polar(sza::Int64 = 30, clump::Float64 = 1.0)
             red              = can_rad.alb_obs[25]                                    # 644.5 in model (MODIS: 620 - 670; 645)
             blue             = (can_rad.alb_obs[7]   + can_rad.alb_obs[8])   / 2      # 464.5 and 474.5 (469.5) in model (MODIS: 459 - 479; 469)
             swir             = (can_rad.alb_obs[104] + can_rad.alb_obs[105]) / 2      # 2117 and 2142 (2129.5) in model (MODIS: 2105 - 2155; 2130)
-            ndvi[vza + 1, psi + 1]             = (nir - red) ./ (nir + red)
-            nirv[vza + 1, psi + 1]             = ndvi[vza + 1, psi + 1] * nir
+            ndvi[vza + 1, psi + 1]             = (nir - red) / (nir + red)
+            nirv[vza + 1, psi + 1]             = ((nir - red) / (nir + red)) * nir
             evi[vza + 1, psi + 1]              = 2.5 * ((nir - red) / (nir + (6 * red) - (7.5 * blue) + 1))
             lswi[vza + 1, psi + 1]             = (nir - swir) / (nir + swir)
         end

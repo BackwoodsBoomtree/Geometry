@@ -366,7 +366,7 @@ function plot_polar_anim(dir_temp_anim::String, file_name_anim::String)
     end
     n = 1
     for i ∈ (89 - (2 * 89)):89 # SZAs
-        p = plot_polar(i, vza_max, "757_vis_animated")
+        p = plot_polar(i, vza_max, "757_vis_animated", 1.0)
         p.savefig(dir_temp_anim*"temp"*string(lpad(n, 3, '0'))*".png")
         n = n + 1
     end
