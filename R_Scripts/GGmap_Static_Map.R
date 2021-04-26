@@ -14,10 +14,15 @@ options(scipen = 999)
 options(digits = 14)
 
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/mzo", full.names = TRUE, pattern = "*.nc4")
-input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
+# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ecostress_us_syv", full.names = TRUE, pattern = "*.nc4")
-# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
+#input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/oco3/Lamont", full.names = TRUE, pattern = "*.nc4")
+# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/Kessler", full.names = TRUE, pattern = "*.nc4")
+
+# OCO2
+input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco2/2015", recursive = TRUE, full.names = TRUE, pattern = "*.nc4")
+
 target_list <- read.csv("C:/Russell/Projects/Geometry/Data/oco3/site_list/oco3_targets.csv")
 
 #### FUNCTIONS ####
@@ -42,12 +47,13 @@ compute_phase_angle <- function(sat){
     pa  <- phase <- raa <- rep(NA, length(sza))
     phase[vaa > saa] <- -1.
     phase[vaa < saa] <-  1.
-    raa              <- vaa - saa
-    idx <- which(raa < -180.)
-    if (length(idx) > 0) raa[idx] <- raa[idx] + 360.
-    idx <- which(raa > 180.)
-    if (length(idx) > 0) raa[idx] <- raa[idx] - 360.
-    raa <- abs(raa)
+    # Relative azimuth angle
+    raa <- abs(saa - vaa)
+    for (i in 1:length(raa)) {
+      if (raa[i] > 180) {
+        raa[i] <- abs(raa[i] - 360)
+      }
+    }
     pa  <- acos(cosd(sza) * cosd(vza) + sind(vza) * sind(sza) * cosd(raa)) * 180. / pi
     pa  <- pa * phase
     return(pa)
@@ -108,13 +114,7 @@ build_data <- function (input_file) {
   saa <- ncvar_get(df, "SAz")
   vza <- ncvar_get(df, "VZA")
   vaa <- ncvar_get(df, "VAz")
-  # Relative azimuth angle
-  raa <- abs(saa - vaa)
-  for (i in 1:length(raa)) {
-    if (raa[i] > 180) {
-      raa[i] <- abs(raa[i] - 360)
-    }
-  }
+  # print(paste0("raa loop inside my build_data() function = ", raa[1]))
   # Meteo
   humidity <- ncvar_get(df, "Meteo/specific_humidity")
   surface_pressure <- ncvar_get(df, "Meteo/surface_pressure")
@@ -135,6 +135,8 @@ build_data <- function (input_file) {
   # Phase Angle
   pa_table <- data.frame(sza, vza, saa, vaa)  # build table
   pa <- compute_phase_angle(pa_table)
+  # Close nc file
+  nc_close(df)
   df <- data.frame("SoundingID" = id, "MeasurementMode" = mode, "OrbitID" = orbit, "cloud_flag_abp" = cloud_flag, "Quality_Flag" = q_flag,
                    "Delta_Time" = as.POSIXct(time, origin = "1990-01-01", tz = "UTC"), "longitude" = lon_center, "latitude" = lat_center,
                    "SIF_Daily_740nm" = sif740_D, "SIF_Daily_757nm" = sif757_D, "SIF_Daily_771nm" = sif771_D,
@@ -143,28 +145,36 @@ build_data <- function (input_file) {
                    "SIF_771nm" = sif771, "SIF_Uncertainty_771nm" = sif771_U, "SIF_Relative_771nm" = sif771_R, "continuum_radiance_771nm" = rad771,
                    "lon_1" = lon1, "lon_2" = lon2, "lon_3" = lon3, "lon_4" = lon4,
                    "lat_1" = lat1, "lat_2" = lat2, "lat_3" = lat3, "lat_4" = lat4,
-                   "SZA" = sza, "SAz" = saa, "VZA" = vza, "VAz" = vaa, "PA" = pa, "RAz" = raa,
+                   "SZA" = sza, "SAz" = saa, "VZA" = vza, "VAz" = vaa, "PA" = pa,
                    "specific_humidity" = humidity, "surface_pressure" = surface_pressure, "temperature_skin" = temp_skin,
                    "temperature_two_meter" = temp_2m, "vapor_pressure_deficit" = vpd, "wind_speed" = wind, "IGBP_index" = igbp, "sounding_land_fraction" = percent_cover)
   df <- na.omit(df) # drop rows that contain an NA anywhere
   # Time Zone
   file_time <<- as.POSIXct((as.numeric(max(df$Delta_Time)) + as.numeric(min(df$Delta_Time))) / 2, origin = "1970-01-01", tz = "UTC")
   file_time <<- as.Date(file_time)
+  # nc_close(input_file)
   return(df)
 }
-build_data_multi <- function (input_dir) {
+build_data_multi <- function (input_dir, mode, flag_cloud, flag_qc) {
   for (f in 1:(length(input_dir))) {
     df_temp <- build_data(input_dir[f])
     df_temp <- subset_flags(df_temp, mode, flag_cloud, flag_qc)
-    df_temp <- subset_location(df_temp, lat_min, lat_max, lon_min, lon_max)
-    df_temp <- subset_cover(df_temp, igbp)
+    df_temp <- remove_urban_barren(df_temp)
+    # df_temp <- subset_cover(df_temp, 2) # Amazon
+    # df_temp <- subset_location(df_temp, -6, 0, -64, -56) # Manaus
+    df_temp <- subset_location(df_temp, 34, 38, -100, -94) # Lamont
     if (f == 1) {
       df <- df_temp
-      assign(paste0("df", f), df, envir = .GlobalEnv) # Return each df individually
+      if (nrow(df) > 0){
+        assign(paste0("df", f), df, envir = .GlobalEnv) # Return each df individually
+      }
     } else {
       df <- rbind(df, df_temp)
-      assign(paste0("df", f), df_temp, envir = .GlobalEnv) # Return each df individually
+      if (nrow(df_temp) > 0){
+        assign(paste0("df", f), df_temp, envir = .GlobalEnv) # Return each df individually
+      }
     }
+    print(paste0("Processed file ", f, " of ", length(input_dir), "."))
   }
   return(df)
 }
@@ -237,13 +247,13 @@ subset_orbit <- function (df, orbit_num) {
   df <- subset(df, OrbitID == orbit_num)
   return(df)
 }
-subset_cover <- function (df, igbp, percent) {
-  if (!is.na(percent)) {
-    df <- subset(df, sounding_land_fraction >= percent) # Filter by percent
-    lab_percent <<- paste0(percent, "%")
-  } else if (is.na(percent)) {
-    lab_percent <<- paste0("")
-  }
+subset_cover <- function (df, igbp) {
+  # if (!is.na(percent)) {
+  #   df <- subset(df, sounding_land_fraction >= percent) # Filter by percent
+  #   lab_percent <<- paste0(percent, "%")
+  # } else if (is.na(percent)) {
+  #   lab_percent <<- paste0("")
+  # }
   if (is.na(igbp)) {
     lab_class <- "All"
   } else if (igbp == 1) {
@@ -361,7 +371,7 @@ build_incoming_sw_ERA5 <- function (era5_data, poly_df){
   incoming_direct_era5 <- brick(era5_data, varname = "msdrswrfcs") # Mean surface direct downward short-wave radiation flux, clear sky
   # Sample radiation raster using OCO footprint polygons and calculate area weighted mean
   incoming_sw_era5 <- (round(as.vector(extract(incoming_sw_era5, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)), digits = 3)) * 0.473
-  incoming_direct_era5 <- (round(as.vector(extract(incoming_direct_era5, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)), digits = 3) * 0.473
+  incoming_direct_era5 <- (round(as.vector(extract(incoming_direct_era5, poly_df, weights = TRUE, fun = mean, na.rm = TRUE)), digits = 3)) * 0.473
   incoming_diffuse_era5 <- incoming_sw_era5 - incoming_direct_era5
   # Add to shapefile
   poly_df$incoming_sw_era5 <- incoming_sw_era5
@@ -387,18 +397,22 @@ build_clump <- function (poly_df){
   poly_df$clump <- as.vector(clump_awm) # add clump to shapefile
   return(poly_df)
 }
-plot_data <- function (df, variable, save, site_name, output_dir, offset) {
+plot_data <- function (df, variable, save, site_name, output_dir, offset, breaks, color) {
   register_google(key = "AIzaSyDPeI_hkrch7DqhKmhFJKeADWBpAKJL3h4")
 
   # Get row from site list for target site
   target_loc <- target_list[target_list$Target.Name %like% site_name, ]
-
+  
   # Labels for plotting
   lab_loc <- gsub("_", " ", site_name)
-  lab_var <- sapply(gsub("_", " ", variable), toupper)
+  lab_var <- gsub("_", " ", variable)
   if (lab_var == "CLUMP") {
     lab_var <- "Clumping Index"
-    }
+  } else if (lab_var == "SIF 757nm") {
+    lab_var <- expression(paste("SIF"['757']*" (W/m"^{2}*"/sr/µm)"))
+  } else if (lab_var == "PA") {
+    lab_var <- "Phase Angle (°)"
+  }
   if (variable == "IGBP_index") {
     df$categorical <- df[[variable]]
     df$categorical <- gsub("\\<0\\>", "0 - Unclassified", df$categorical)
@@ -433,11 +447,44 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
     df$categorical <- gsub("\\<2\\>", "2 - Bad", df$categorical)
     df$categorical <- gsub("\\<-1\\>", "-1 - Not Investigated", df$categorical)
     cat_labels <- mixedsort(unique(df$categorical))
-  } else {
+  } else if (length(breaks) < 2 && is.na(breaks)) {
     df$categorical <- cut(df[[variable]], 7, include.lowest = TRUE, dig.lab = 3)
     cat_labels <- gsub("\\[|\\]|\\(|\\)", "", sort(unique(df$categorical))) # remove brackets
     cat_labels <- gsub("\\,", " - ", cat_labels)
+  } else if (length(breaks) > 1 && (variable == "PA")) {
+    for (i in 1:(length(breaks) / 2)) {
+      if (i == 1) {
+        cat_labels <- c(paste0(breaks[i], " - ", breaks[i + 1]))
+      } else {
+        cat_labels <- c(cat_labels, paste0(breaks[(i * 2) - 1], " - ", breaks[i * 2]))
+      }
+    }
+    for (i in 1:nrow(df)) {
+      for (j in 1:length(cat_labels)) {
+        if (j == 1) {
+          if (df$PA[i] >= breaks[j] && df$PA[i] <= breaks[j + 1]) {
+            df$categorical[i] <- j
+          }
+        } else {
+          if (df$PA[i] >= breaks[(j * 2) - 1] && df$PA[i] <= breaks[j * 2]) {
+            df$categorical[i] <- j
+          }
+        }
+      }
+    }
+  } else {
+    for (i in 1:(length(breaks) - 1)) {
+      if (i == 1) {
+        cat_labels <- paste0("< ", breaks[i + 1])
+      } else if (i == length(breaks) - 1) {
+        cat_labels <- c(cat_labels, paste0("> ", breaks[i]))
+      } else {
+        cat_labels <- c(cat_labels, paste0(breaks[i], " - ", breaks[i + 1]))
+      }
+    }
+    df$categorical <- cut(df[[variable]], breaks = breaks, labels = cat_labels, include.lowest = TRUE)
   }
+  
   # ggplot2 doesn't process SpatialPolygonDataFrame directly, so we must use fortify
   df$id <- rownames(df@data)
   df_fort <- fortify(df, region = "id") # id column here is a unique identifier for each row
@@ -459,15 +506,33 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
   time_zone <- tz_lookup_coords(as.numeric(center_point[2]), as.numeric(center_point[1]), "accurate")
   lab_time <- as.POSIXct((as.numeric(max(df$Delta_Time)) + as.numeric(min(df$Delta_Time))) / 2, origin = "1970-01-01", tz = "UTC")
   lab_time <- format(lab_time, tz = time_zone, usetz = TRUE)
-  # Main map
+  # COLORS
+  if (variable == "PA") { # Bright color on low values for PA
+    if (color == "plasma") {
+      col_map <- plasma(length(unique(df$categorical)))
+      col_h   <- rev(plasma(length(unique(df$categorical))))
+    } else if (color == "viridis") {
+      col_map <- viridis(length(unique(df$categorical)))
+      col_h   <- rev(viridis(length(unique(df$categorical))))
+    }
+  } else {
+    if (color == "plasma") {
+      col_map <- rev(plasma(length(unique(df$categorical))))
+      col_h   <- plasma(length(unique(df$categorical)))
+    } else if (color == "viridis") {
+      col_map <- rev(viridis(length(unique(df$categorical))))
+      col_h   <- viridis(length(unique(df$categorical)))
+    }
+  }
+    # Main map
   map_main <- ggmap(get_map(location = c(lon = as.numeric(center_point[1]), lat = as.numeric(center_point[2])), source = "google", maptype="satellite", zoom = autozoom)) +
     geom_polygon(data = df_plot, aes(x = long, y = lat, group = group, fill = factor(categorical))) +
     scale_fill_manual(
-      values = rev(plasma(length(unique(df$categorical)))),
+      values = col_map,
       breaks = rev(mixedsort(unique(df$categorical))),
       labels = rev(cat_labels)) +
     labs(title = paste0(lab_loc, "\n", lab_time, " | Orbit ", df$OrbitID[1], " | Mode: ", lab_mode,
-                        "\nCover: ", lab_class, " ", lab_percent, " | QC Filter: ", gsub("_", " ", lab_qc), " | Cloud Filter: ", gsub("_", " ", lab_cloud)),
+                        "\nCover: ", lab_class, " ", " | QC Filter: ", gsub("_", " ", lab_qc), " | Cloud Filter: ", gsub("_", " ", lab_cloud)),
                         fill = lab_var) +
     theme(axis.ticks = element_blank(), axis.title = element_blank(), panel.border = element_rect(colour = "black", fill=NA),
           plot.title = element_text(hjust = 0.5), legend.justification = c(0, 1), legend.position = c(1.025, 1), legend.key.size = unit(1.0, 'lines')) +
@@ -485,7 +550,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
     h <- ggplot(df@data, aes(x = factor(sounding_land_fraction), fill=factor(sounding_land_fraction))) + xlab(lab_var) +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(
-        values = plasma(length(unique(df$categorical)))) +
+        values = col_h) +
       scale_y_continuous(expand = expansion(mult = c(0, .1))) +
       theme(panel.border = element_rect(colour = "black", fill=NA), panel.background = element_blank(),
             axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
@@ -496,7 +561,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
     h <- ggplot(df@data, aes(x = factor(cloud_flag), fill=factor(cloud_flag))) + xlab(lab_var) +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(
-        values = plasma(length(unique(df$categorical)))) +
+        values = col_h) +
       scale_y_continuous(expand = expansion(mult = c(0, .1))) +
       theme(panel.border = element_rect(colour = "black", fill = NA), panel.background = element_blank(),
             axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
@@ -507,7 +572,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
     h <- ggplot(df@data, aes(x=factor(Quality_Flag), fill=factor(Quality_Flag))) + xlab(lab_var) +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(
-        values = plasma(length(unique(df$categorical)))) +
+        values = col_h) +
       scale_y_continuous(expand = expansion(mult = c(0, .1))) +
       theme(panel.border = element_rect(colour = "black", fill = NA), panel.background = element_blank(),
             axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
@@ -524,23 +589,52 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset) {
             axis.text.x = element_text(margin = unit(c(0, 0, 0.1, 0), "cm")),
             axis.text.y = element_text(margin = unit(c(0, 0, 0.1, 0), "cm")),
             axis.title.x = element_text(margin = unit(c(0, 0, 0, 0), "cm")))
-  } else {
-    h <- ggplot(df@data, aes_string(x = variable)) + xlab(lab_var) +
-      geom_histogram(aes(y = ..density..), binwidth = 0.25, color = "black", fill = "gray85") +
-      geom_density(alpha = .2, fill = "#FF6666") +
-      scale_x_continuous(expand = c(0, 0)) +
+  } else if (variable == "SIF_757nm"){
+    h <- ggplot(df@data, aes(x=factor(categorical), fill=factor(categorical))) + ggtitle("Number of Soundings") +
+      geom_bar(show.legend = FALSE) +
+      scale_fill_manual(
+        values = col_h) +
       scale_y_continuous(expand = expansion(mult = c(0, .1))) +
       theme(panel.border = element_rect(colour = "black", fill = NA), panel.background = element_blank(),
             axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
-            axis.text.x = element_text(margin = unit(c(0, 0, 0.1, 0), "cm")),
-            axis.text.y = element_blank(),
-            axis.title.x = element_text(margin = unit(c(0, 0, 0, 0), "cm")))
+            axis.text.x = element_blank(),
+            axis.text.y = element_text(margin = unit(c(0, 0, 0.1, 0), "cm")),
+            axis.title.x = element_blank(),
+            plot.title = element_text(size=11, hjust = 0.5))
+  } else if (variable == "PA"){
+    h <- ggplot(df@data, aes(x=factor(categorical), fill=factor(categorical))) + ggtitle("Number of Soundings") +
+      geom_bar(show.legend = FALSE) +
+      scale_fill_manual(
+        values = col_h) +
+      scale_y_continuous(expand = expansion(mult = c(0, .1))) +
+      theme(panel.border = element_rect(colour = "black", fill = NA), panel.background = element_blank(),
+            axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
+            axis.text.x = element_blank(),
+            axis.text.y = element_text(margin = unit(c(0, 0, 0.1, 0), "cm")),
+            axis.title.x = element_blank(),
+            plot.title = element_text(size=11, hjust = 0.5))
+  } else {
+    # Here we grab number of data and define bin width because we need to scale the density curve to frequency (count)
+    bw <- 0.25
+    n  <- nrow(df@data)
+    h <- ggplot(df@data, aes_string(x = variable)) + xlab(lab_var) + ylab("Soundings") +
+      geom_histogram(binwidth = bw, color = "black", fill = "gray85") +
+      geom_density(aes(y = ..density.. * (n * bw)), alpha = .2, fill = "#FF6666") +
+      scale_x_continuous(expand = c(0, 0)) +
+      scale_y_continuous(expand = expansion(mult = c(0, .1))) +
+      theme(panel.border = element_rect(colour = "black", fill = NA), panel.background = element_blank(),
+            # margin(t = 0, r = 20, b = 0, l = 0)
+            axis.title.y = element_text(margin = unit(c(0, 0.1, 0, 0), "cm")),
+            # axis.text.x = element_text(margin = unit(c(0, 0, 0.2, 0), "cm")),
+            # axis.text.y = element_text(margin = unit(c(0, 0, 0, 0), "cm")),
+            axis.title.x = element_text(margin = unit(c(0.1, 0, 0, 0), "cm")),
+            axis.ticks = element_blank())
   }
   # Viewports
   vp_main <- viewport(x = 0.5, y = 0.5)
   vp_map <- viewport(x = 0.375, y = 0.5, width = 1)
-  vp1 <- viewport(width = 0.19, height = 0.15, x = 0.87, y = 0.375)
-  vp2 <- viewport(width = 0.23, height = 0.23, x = 0.87, y = 0.15)
+  vp1 <- viewport(width = 0.20, height = 0.2, x = 0.87, y = 0.475)
+  vp2 <- viewport(width = 0.28, height = 0.28, x = 0.87, y = 0.175)
   if (save) {
     pdf(paste0(output_dir, site_name, "_", variable, "_", lab_mode, "_", df$OrbitID[1], "_Cloud", gsub("/", "", lab_cloud), "_QC",
                gsub("/", "", lab_qc), "_Cover_", gsub(" ", "", lab_class), ".pdf"), width = 7.5, height = 6.25, compress = FALSE)
@@ -643,11 +737,11 @@ plot_data_niwot <- function (df, variable, save, site_name, output_dir, offset) 
   map_main <- ggmap(get_map(location = c(lon = as.numeric(center_point[1]), lat = as.numeric(center_point[2])), source = "google", maptype="satellite", zoom = autozoom)) +
     geom_polygon(data = df_plot, aes(x = long, y = lat, group = group, fill = factor(categorical))) +
     scale_fill_manual(
-      values = rev(plasma(length(unique(df$categorical)))),
+      values = col_map,
       breaks = rev(mixedsort(unique(df$categorical))),
       labels = rev(cat_labels)) +
     labs(title = paste0(lab_loc, "\n", lab_time, " | Orbit ", df$OrbitID[1], " | Mode: ", lab_mode,
-                        "\nCover: ", lab_class, " ", lab_percent, " | QC Filter: ", gsub("_", " ", lab_qc), " | Cloud Filter: ", gsub("_", " ", lab_cloud)),
+                        "\nCover: ", lab_class, " ", " | QC Filter: ", gsub("_", " ", lab_qc), " | Cloud Filter: ", gsub("_", " ", lab_cloud)),
                         fill = lab_var) +
     theme(axis.ticks = element_blank(), axis.title = element_blank(), panel.border = element_rect(colour = "black", fill=NA),
           plot.title = element_text(hjust = 0.5), legend.justification = c(0, 1), legend.position = c(1.025, 1), legend.key.size = unit(1.0, 'lines'), legend.title = element_text(size=11)) +
@@ -665,7 +759,7 @@ plot_data_niwot <- function (df, variable, save, site_name, output_dir, offset) 
     h <- ggplot(df@data, aes(x = factor(sounding_land_fraction), fill=factor(sounding_land_fraction))) + xlab(lab_var) +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(
-        values = plasma(length(unique(df$categorical)))) +
+        values = col_h) +
       scale_y_continuous(expand = expansion(mult = c(0, .1))) +
       theme(panel.border = element_rect(colour = "black", fill=NA), panel.background = element_blank(),
             axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
@@ -676,7 +770,7 @@ plot_data_niwot <- function (df, variable, save, site_name, output_dir, offset) 
     h <- ggplot(df@data, aes(x = factor(cloud_flag), fill=factor(cloud_flag))) + xlab(lab_var) +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(
-        values = plasma(length(unique(df$categorical)))) +
+        values = col_h) +
       scale_y_continuous(expand = expansion(mult = c(0, .1))) +
       theme(panel.border = element_rect(colour = "black", fill = NA), panel.background = element_blank(),
             axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
@@ -687,7 +781,7 @@ plot_data_niwot <- function (df, variable, save, site_name, output_dir, offset) 
     h <- ggplot(df@data, aes(x=factor(Quality_Flag), fill=factor(Quality_Flag))) + xlab(lab_var) +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(
-        values = plasma(length(unique(df$categorical)))) +
+        values = col_h) +
       scale_y_continuous(expand = expansion(mult = c(0, .1))) +
       theme(panel.border = element_rect(colour = "black", fill = NA), panel.background = element_blank(),
             axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
@@ -698,7 +792,7 @@ plot_data_niwot <- function (df, variable, save, site_name, output_dir, offset) 
     h <- ggplot(df@data, aes(x=factor(categorical), fill=factor(categorical))) + ggtitle("Number of Soundings") +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(
-        values = plasma(length(unique(df$categorical)))) +
+        values = col_h) +
       scale_y_continuous(expand = expansion(mult = c(0, .1))) +
       theme(panel.border = element_rect(colour = "black", fill = NA), panel.background = element_blank(),
             axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
@@ -710,7 +804,7 @@ plot_data_niwot <- function (df, variable, save, site_name, output_dir, offset) 
     h <- ggplot(df@data, aes(x=factor(categorical), fill=factor(categorical))) + ggtitle("Number of Soundings") +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(
-        values = plasma(length(unique(df$categorical)))) +
+        values = col_h) +
       scale_y_continuous(expand = expansion(mult = c(0, .1))) +
       theme(panel.border = element_rect(colour = "black", fill = NA), panel.background = element_blank(),
             axis.title.y = element_blank(), axis.ticks = element_blank(), plot.margin = unit(c(0, 0, 0, -0.2), "cm"),
@@ -749,7 +843,9 @@ plot_data_niwot <- function (df, variable, save, site_name, output_dir, offset) 
 }
 
 #### PLOTTING SITES ####
-df <- build_data(input_dir[3])
+# df <- build_data(input_dir[1])
+
+df <- build_data_multi(input_dir, 2, 0, 0)
 
 # Args: input df, mode, cloud flag, qc flag
 # mode: 0 = Nadir; 1 = Glint; 2 = Target; 3 = SAM; 4 = Transition; 5 = SAM & Target
@@ -759,17 +855,18 @@ df <- subset_flags(df, 3, 0, 0)
 
 # min lat, max lat, min lon, max lon
 # df <- subset_location(df, 37, 40, -95, -90) # mzo
-df <- subset_location(df, 39, 42, -108, -104) # niwot
+# df <- subset_location(df, 39, 42, -108, -104) # niwot
 # df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
 # f <- subset_location(df, 35, 37, 139, 141) # Tokyo
-# df <- subset_location(df, 34, 38, -100, -94) # Lamont
+df <- subset_location(df, 34, 38, -100, -94) # Lamont
+# df <- subset_location(df, 34, 37, -100, -97) # Kessler
 
 # IGBP number and percent
 # df <- subset_cover(df, NA, NA) # mzo
-df <- subset_cover(df, NA, NA) # niwot
+# df <- subset_cover(df, NA, NA) # niwot
 # df <- subset_cover(df, NA, NA) # ecostress_us_syv
-# df <- subset_cover(df, 2, 100) # Amazon
-# df <- subset_cover(df, "None") # Lamont
+df <- subset_cover(df, 2, 100) # Amazon
+# df <- subset_cover(df, NA, NA) # Kessler
 
 # Remove urban and barren
 df <- remove_urban_barren(df)
@@ -805,11 +902,22 @@ poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_S
 
 # Arg: SpatialPolygonDF, variable of interest, save to file?, site name, output directory name, offset autozoom
 # plot_data(poly_df, "SIF_740nm", TRUE, "sif_Ozark_USA", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1)
-plot_data_niwot(poly_df, "SIF_Relative_757nm", TRUE, "Niwot_Ridge", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
+# plot_data_niwot(poly_df, "SIF_Relative_757nm", TRUE, "Niwot_Ridge", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
 # plot_data(poly_df, "sif740", TRUE, "ecostress_us_syv", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
 # plot_data(poly_df, "SIF_740nm", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
 # plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
 # plot_data(poly_df, "sif740", TRUE, "val_lamontOK", "C:/Russell/R_Scripts/Geometry/")
+
+#### For SIF, bookend the values we want by large values
+# break_list <- c(-5, 0.25, 0.5, 0.75, 1.0, 1.25, 5) # Kessler
+# break_list <- c(-5, 0.4, 0.7, 1.0, 1.3, 1.6, 5) # Amazon Incorrect
+break_list <- c(-5, 0, 0.4, 0.8, 1.2, 1.6, 5) # Lamont OCO-2
+
+#### PA values do not need bookends; grouped, not broken into equal parts
+# break_list <- c(-43.2, -40.4, -31.6, -30.6, -20.7, -19.4, 21.6, 24.5, 33.8, 35.5, 42.5, 43.6) # Kessler
+# break_list <- c(-25.6, -24.1, 24.7, 26.6, 31.7, 33.5, 45.4, 46.1, 57.4, 60.1, 67.7, 69.6, 76.0, 77.6) # Amazon Incorrect
+
+plot_data(poly_df, "SIF_757nm", TRUE, "Lamont Oklahoma", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1, break_list, "viridis")
 
 # Export df to csv
 write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_niwot_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".csv"), row.names = FALSE)
@@ -820,6 +928,7 @@ write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts
 # Export to shapefile
 shapefile(poly_df, paste0("C:/Russell/Projects/Geometry/R_Scripts/SHP/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".shp"), overwrite = TRUE)
 
+shapefile(poly_df, "C:/Russell/Projects/Geometry/R_Scripts/SHP/oco2_target_Lamont_2019_06.shp", overwrite = TRUE)
 
 
 

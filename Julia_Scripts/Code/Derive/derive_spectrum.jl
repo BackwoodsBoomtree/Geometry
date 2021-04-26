@@ -49,8 +49,8 @@ function derive_spectrum(input_data, source_cab, week, clumping, sif_yield)
 
         # change incoming radiation
         in_rad = deepcopy(in_rad_bak);
-        in_rad.E_direct  .*= input_data.incoming_direct_era5[i]  / e_all_dire;
-        in_rad.E_diffuse .*= input_data.incoming_diffuse_era5[i] / e_all_diff;
+        in_rad.E_direct  .*= input_data.incoming_direct_par_era5[i]  / e_all_dire;
+        in_rad.E_diffuse .*= input_data.incoming_diffuse_par_era5[i] / e_all_diff;
 
         # Run fluspect on each layer to change Cab
         for j in 1:20
