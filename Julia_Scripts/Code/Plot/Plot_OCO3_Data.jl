@@ -5,7 +5,7 @@ using Plots.PlotMeasures
 
 # Plotting SIF
 function scatter_plot_SIF(dfs::Vector{DataFrame}, plot_title)
-    dfs_mean, dfs_mae = means_and_errors(dfs)
+    dfs_mean, dfs_mae = stats_and_errors(dfs)
     
     # df for regression results. Row 1 to 5 is R2, pval, slope, intercept, mae.
     sif_names = ["sif_740", "sif_757", "sif_771"]
@@ -35,8 +35,8 @@ function scatter_plot_SIF(dfs::Vector{DataFrame}, plot_title)
     return(sif_results, dfs_mean, p)
 end
 
-function scatter_plot_SIF_757_niwot(dfs::Vector{DataFrame}, plot_title)
-    dfs_mean, dfs_mae = means_and_errors(dfs)
+function results_SIF(dfs::Vector{DataFrame}, plot_title)
+    dfs_mean, dfs_mae = stats_and_errors(dfs)
     
     # df for regression results. Row 1 to 5 is R2, pval, slope, intercept, mae.
     sif_names = ["sif_740", "sif_757", "sif_771"]

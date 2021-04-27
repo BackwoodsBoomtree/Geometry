@@ -16,12 +16,13 @@ options(digits = 14)
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/mzo", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ecostress_us_syv", full.names = TRUE, pattern = "*.nc4")
-#input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
+# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/oco3/Lamont", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/Kessler", full.names = TRUE, pattern = "*.nc4")
+input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/umb", full.names = TRUE, pattern = "*.nc4")
 
 # OCO2
-input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco2/2015", recursive = TRUE, full.names = TRUE, pattern = "*.nc4")
+# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco2/2015", recursive = TRUE, full.names = TRUE, pattern = "*.nc4")
 
 target_list <- read.csv("C:/Russell/Projects/Geometry/Data/oco3/site_list/oco3_targets.csv")
 
@@ -647,7 +648,7 @@ plot_data <- function (df, variable, save, site_name, output_dir, offset, breaks
   print(h, vp = vp1)
   print(map_loc, vp = vp2)
 }
-plot_data_niwot <- function (df, variable, save, site_name, output_dir, offset) {
+plot_data_renato <- function (df, variable, save, site_name, output_dir, offset, color) {
   register_google(key = "AIzaSyDPeI_hkrch7DqhKmhFJKeADWBpAKJL3h4")
 
   # Get row from site list for target site
@@ -660,7 +661,7 @@ plot_data_niwot <- function (df, variable, save, site_name, output_dir, offset) 
     lab_var <- "Clumping Index"
   }
   if (lab_var == "SIF 757NM") {
-    lab_var <- expression(paste("SIF"['757']*" (W/m"^{2}*"/sr/Âµm)"))
+    lab_var <- expression(paste("SIF"['757']*" (W/m"^{2}*"/sr/µm)"))
   }
 
   if (variable == "IGBP_index") {
@@ -733,6 +734,24 @@ plot_data_niwot <- function (df, variable, save, site_name, output_dir, offset) 
   time_zone <- tz_lookup_coords(as.numeric(center_point[2]), as.numeric(center_point[1]), "accurate")
   lab_time <- as.POSIXct((as.numeric(max(df$Delta_Time)) + as.numeric(min(df$Delta_Time))) / 2, origin = "1970-01-01", tz = "UTC")
   lab_time <- format(lab_time, tz = time_zone, usetz = TRUE)
+  # COLORS
+  if (variable == "PA") { # Bright color on low values for PA
+    if (color == "plasma") {
+      col_map <- plasma(length(unique(df$categorical)))
+      col_h   <- rev(plasma(length(unique(df$categorical))))
+    } else if (color == "viridis") {
+      col_map <- viridis(length(unique(df$categorical)))
+      col_h   <- rev(viridis(length(unique(df$categorical))))
+    }
+  } else {
+    if (color == "plasma") {
+      col_map <- rev(plasma(length(unique(df$categorical))))
+      col_h   <- plasma(length(unique(df$categorical)))
+    } else if (color == "viridis") {
+      col_map <- rev(viridis(length(unique(df$categorical))))
+      col_h   <- viridis(length(unique(df$categorical)))
+    }
+  }
   # Main map
   map_main <- ggmap(get_map(location = c(lon = as.numeric(center_point[1]), lat = as.numeric(center_point[2])), source = "google", maptype="satellite", zoom = autozoom)) +
     geom_polygon(data = df_plot, aes(x = long, y = lat, group = group, fill = factor(categorical))) +
@@ -843,9 +862,9 @@ plot_data_niwot <- function (df, variable, save, site_name, output_dir, offset) 
 }
 
 #### PLOTTING SITES ####
-# df <- build_data(input_dir[1])
+df <- build_data(input_dir[2])
 
-df <- build_data_multi(input_dir, 2, 0, 0)
+# df <- build_data_multi(input_dir, 2, 0, 0)
 
 # Args: input df, mode, cloud flag, qc flag
 # mode: 0 = Nadir; 1 = Glint; 2 = Target; 3 = SAM; 4 = Transition; 5 = SAM & Target
@@ -857,15 +876,17 @@ df <- subset_flags(df, 3, 0, 0)
 # df <- subset_location(df, 37, 40, -95, -90) # mzo
 # df <- subset_location(df, 39, 42, -108, -104) # niwot
 # df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
-# f <- subset_location(df, 35, 37, 139, 141) # Tokyo
-df <- subset_location(df, 34, 38, -100, -94) # Lamont
+# df <- subset_location(df, 35, 37, 139, 141) # Tokyo
+# df <- subset_location(df, 34, 38, -100, -94) # Lamont
 # df <- subset_location(df, 34, 37, -100, -97) # Kessler
+df <- subset_location(df, 44, 47, -87, -83) # UMB
+
 
 # IGBP number and percent
 # df <- subset_cover(df, NA, NA) # mzo
 # df <- subset_cover(df, NA, NA) # niwot
 # df <- subset_cover(df, NA, NA) # ecostress_us_syv
-df <- subset_cover(df, 2, 100) # Amazon
+# df <- subset_cover(df, 2, 100) # Amazon
 # df <- subset_cover(df, NA, NA) # Kessler
 
 # Remove urban and barren
@@ -890,23 +911,25 @@ poly_df <- build_laiCop("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-20_1900.nc", poly_df) # mzo
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-18_2000.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-14_2300.nc", poly_df) # niwot
-poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-16_2100.nc", poly_df) # niwot
+# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-16_2100.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2019-10-15_1600.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_1700.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_2300.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-17.nc", poly_df) # ecostress_us_syv
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-26.nc", poly_df) # ATTO - incorrect
+# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-06_1900.nc", poly_df) # umb
+poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-11_2100.nc", poly_df) # umb
 
 # Add EVI to shapefile
 # poly_df <- build_evi("C:/Russell/Projects/Geometry/Data/evi/GPP.2019177.h12v08.tif", poly_df)
 
 # Arg: SpatialPolygonDF, variable of interest, save to file?, site name, output directory name, offset autozoom
 # plot_data(poly_df, "SIF_740nm", TRUE, "sif_Ozark_USA", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1)
-# plot_data_niwot(poly_df, "SIF_Relative_757nm", TRUE, "Niwot_Ridge", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
 # plot_data(poly_df, "sif740", TRUE, "ecostress_us_syv", "C:/Russell/Projects/Geometry/R_Scripts/Figures/")
 # plot_data(poly_df, "SIF_740nm", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
 # plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
 # plot_data(poly_df, "sif740", TRUE, "val_lamontOK", "C:/Russell/R_Scripts/Geometry/")
+plot_data_renato(poly_df, "SIF_757nm", TRUE, "UMB", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1, "plasma")
 
 #### For SIF, bookend the values we want by large values
 # break_list <- c(-5, 0.25, 0.5, 0.75, 1.0, 1.25, 5) # Kessler
@@ -920,10 +943,13 @@ break_list <- c(-5, 0, 0.4, 0.8, 1.2, 1.6, 5) # Lamont OCO-2
 plot_data(poly_df, "SIF_757nm", TRUE, "Lamont Oklahoma", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1, break_list, "viridis")
 
 # Export df to csv
-write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_niwot_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".csv"), row.names = FALSE)
+# write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_niwot_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".csv"), row.names = FALSE)
 # write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_Ozark_USA_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".csv"), row.names = FALSE)
 # write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ecostress_us_syv_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), ".csv"), row.names = FALSE)
 # write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".csv"), row.names = FALSE)
+write.csv(as.data.frame(poly_df), paste0("C:/Russell/Projects/Geometry/R_Scripts/CSV/sif_umb_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".csv"), row.names = FALSE)
+
+
 
 # Export to shapefile
 shapefile(poly_df, paste0("C:/Russell/Projects/Geometry/R_Scripts/SHP/sif_ATTO_Tower_Manaus_Brazil_(incorrect)_", format(file_time, format = '%Y-%m-%d', usetz = FALSE), "_", poly_df$OrbitID[1], ".shp"), overwrite = TRUE)
