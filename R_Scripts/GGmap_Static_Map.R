@@ -14,12 +14,12 @@ options(scipen = 999)
 options(digits = 14)
 
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/mzo", full.names = TRUE, pattern = "*.nc4")
-# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
+input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/niwot", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ecostress_us_syv", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/ATTO_incorrect", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/oco3/Lamont", full.names = TRUE, pattern = "*.nc4")
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/Kessler", full.names = TRUE, pattern = "*.nc4")
-input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/umb", full.names = TRUE, pattern = "*.nc4")
+# input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco3/umb", full.names = TRUE, pattern = "*.nc4")
 
 # OCO2
 # input_dir <- list.files(path = "C:/Russell/Projects/Geometry/Data/oco2/2015", recursive = TRUE, full.names = TRUE, pattern = "*.nc4")
@@ -136,6 +136,13 @@ build_data <- function (input_file) {
   # Phase Angle
   pa_table <- data.frame(sza, vza, saa, vaa)  # build table
   pa <- compute_phase_angle(pa_table)
+  # Relative azimuth angle
+  raa <- abs(saa - vaa)
+  for (i in 1:length(raa)) {
+    if (raa[i] > 180) {
+      raa[i] <- abs(raa[i] - 360)
+    }
+  }
   # Close nc file
   nc_close(df)
   df <- data.frame("SoundingID" = id, "MeasurementMode" = mode, "OrbitID" = orbit, "cloud_flag_abp" = cloud_flag, "Quality_Flag" = q_flag,
@@ -146,7 +153,7 @@ build_data <- function (input_file) {
                    "SIF_771nm" = sif771, "SIF_Uncertainty_771nm" = sif771_U, "SIF_Relative_771nm" = sif771_R, "continuum_radiance_771nm" = rad771,
                    "lon_1" = lon1, "lon_2" = lon2, "lon_3" = lon3, "lon_4" = lon4,
                    "lat_1" = lat1, "lat_2" = lat2, "lat_3" = lat3, "lat_4" = lat4,
-                   "SZA" = sza, "SAz" = saa, "VZA" = vza, "VAz" = vaa, "PA" = pa,
+                   "SZA" = sza, "SAz" = saa, "VZA" = vza, "VAz" = vaa, "RAz" = raa, "PA" = pa,
                    "specific_humidity" = humidity, "surface_pressure" = surface_pressure, "temperature_skin" = temp_skin,
                    "temperature_two_meter" = temp_2m, "vapor_pressure_deficit" = vpd, "wind_speed" = wind, "IGBP_index" = igbp, "sounding_land_fraction" = percent_cover)
   df <- na.omit(df) # drop rows that contain an NA anywhere
@@ -874,12 +881,12 @@ df <- subset_flags(df, 3, 0, 0)
 
 # min lat, max lat, min lon, max lon
 # df <- subset_location(df, 37, 40, -95, -90) # mzo
-# df <- subset_location(df, 39, 42, -108, -104) # niwot
+df <- subset_location(df, 39, 42, -108, -104) # niwot
 # df <- subset_location(df, 0, 5, -61, -57) # ATTO - incorrect
 # df <- subset_location(df, 35, 37, 139, 141) # Tokyo
 # df <- subset_location(df, 34, 38, -100, -94) # Lamont
 # df <- subset_location(df, 34, 37, -100, -97) # Kessler
-df <- subset_location(df, 44, 47, -87, -83) # UMB
+# df <- subset_location(df, 44, 47, -87, -83) # UMB
 
 
 # IGBP number and percent
@@ -893,12 +900,12 @@ df <- subset_location(df, 44, 47, -87, -83) # UMB
 df <- remove_urban_barren(df)
 
 # Orbit number
-# df_6283 <- subset_orbit(df, 6283)
+df_6283 <- subset_orbit(df, 6283)
 # df_6287 <- subset_orbit(df, 6287)
 
-# poly_df <- build_polyDF(df_6283) # Build shapefile
+poly_df <- build_polyDF(df_6283) # Build shapefile
 # poly_df <- build_polyDF(df_6287) # Build shapefile
-poly_df <- build_polyDF(df) # Build shapefile
+# poly_df <- build_polyDF(df) # Build shapefile
 
 # Add clumping index to shapefile
 poly_df <- build_clump(poly_df)
@@ -917,8 +924,8 @@ poly_df <- build_laiCop("C:/Russell/Projects/Geometry/Data/lai/c_gls_LAI-RT0_202
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-12_2300.nc", poly_df) # niwot
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-17.nc", poly_df) # ecostress_us_syv
 # poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-06-26.nc", poly_df) # ATTO - incorrect
-# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-06_1900.nc", poly_df) # umb
-poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-11_2100.nc", poly_df) # umb
+poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-06_1900.nc", poly_df) # umb
+# poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_SWDOWN_2020-08-11_2100.nc", poly_df) # umb
 
 # Add EVI to shapefile
 # poly_df <- build_evi("C:/Russell/Projects/Geometry/Data/evi/GPP.2019177.h12v08.tif", poly_df)
@@ -929,7 +936,8 @@ poly_df <- build_incoming_sw_ERA5("C:/Russell/Projects/Geometry/Data/era5/ERA5_S
 # plot_data(poly_df, "SIF_740nm", TRUE, "sif_ATTO_Tower_Manaus_Brazil_(incorrect)", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0)
 # plot_data(poly_df, "sif740_D", FALSE, "val_tsukubaJp", "C:/Russell/R_Scripts/Geometry/")
 # plot_data(poly_df, "sif740", TRUE, "val_lamontOK", "C:/Russell/R_Scripts/Geometry/")
-plot_data_renato(poly_df, "SIF_757nm", TRUE, "UMB", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1, "plasma")
+plot_data_renato(poly_df, "SIF_757nm", TRUE, "sif_Niwot", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", 0, "plasma")
+# plot_data_renato(poly_df, "clump", TRUE, "sif_University_of_Michigan_USA", "C:/Russell/Projects/Geometry/R_Scripts/Figures/", -1, "viridis")
 
 #### For SIF, bookend the values we want by large values
 # break_list <- c(-5, 0.25, 0.5, 0.75, 1.0, 1.25, 5) # Kessler
