@@ -4,8 +4,11 @@ library(lubridate)
 library(LSD)
 library(MASS)
 
-PA  <- abs(df111$PA)
-SIF <- df111$SIF_757nm
+# PA  <- abs(df111$PA)
+# SIF <- df111$SIF_757nm
+
+PA  <- c(1, 2, 3, 4, 5, 6)
+SIF <- c(-1, 1, 0, 1.25, 1.5, 2)
 
 par(oma=c(3,3,2,1.25))
 
@@ -14,7 +17,6 @@ par(oma=c(3,3,2,1.25))
 # Axes margin
 op <- par(mar = c(0,0,0,0))
 
-plot(PA, SIF, type="n", ylim=c(-1,2), xlim=c(0,80), ann=FALSE, axes=FALSE)
 heatscatter(PA, SIF, cex.axis=1.25, ylim=c(-1,2), xlim=c(0,70),
             cexplot = 1, main=FALSE, tck=0.03, mgp=c(3, 0.2, 0))
 
